@@ -1,0 +1,13 @@
+{
+  "name": "bilibili-study-focus-assistant-tests",
+  "version": "1.0.0",
+  "description": "Property-based tests for BiliBili Study Focus Reminder Assistant",
+  "main": "bilibili-study-focus-assistant.test.js",
+  "scripts": {
+    "test": "jest --runInBand"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "fast-check": "^3.15.0"
+  }
+}
