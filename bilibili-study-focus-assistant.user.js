@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.1
+// @version      1.0.3
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -440,6 +440,137 @@ const STYLES = `
     /* Dynamic visual effect applied via JS */
     .bilibili-study-visual-effect {
         transition: filter 0.5s ease, opacity 0.5s ease;
+    }
+
+    /* Dark mode for detail panel */
+    .bilibili-study-dark-mode {
+        background-color: rgba(0, 0, 0, 0.85) !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal {
+        background: #1e1e1e !important;
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal-header {
+        background: #252525 !important;
+        border-bottom: 1px solid #3a3a3a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal-header h2 {
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal-close {
+        color: #aaa !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal-close:hover {
+        color: #fff !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-modal-module {
+        background: #252525 !important;
+        border: 1px solid #3a3a3a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-module-title {
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-module-content {
+        color: #b0b0b0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-stat-row {
+        border-bottom-color: #3a3a3a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-stat-label {
+        color: #999 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-stat-value {
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn {
+        background: #333 !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #444 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn:hover {
+        background: #444 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn-primary {
+        background: #00a1d6 !important;
+        color: #fff !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn-primary:hover {
+        background: #0087b8 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn-secondary {
+        background: #3a3a3a !important;
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-btn-secondary:hover {
+        background: #4a4a4a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-progress-bar {
+        background: #2a2a2a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-trend-bar-container {
+        background: #2a2a2a !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-trend-date,
+    .bilibili-study-dark-mode .bilibili-study-trend-time {
+        color: #999 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-answer-correct {
+        background: #1a4d2e !important;
+        color: #4ade80 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-answer-incorrect {
+        background: #4d1a1a !important;
+        color: #f87171 !important;
+    }
+    
+    .bilibili-study-dark-mode .bilibili-study-no-data {
+        color: #666 !important;
+    }
+    
+    .bilibili-study-dark-mode input[type="text"] {
+        background: #2a2a2a !important;
+        color: #e0e0e0 !important;
+        border-color: #444 !important;
+    }
+    
+    .bilibili-study-dark-mode input[type="text"]::placeholder {
+        color: #666 !important;
+    }
+    
+    .bilibili-study-dark-mode small {
+        color: #777 !important;
+    }
+    
+    .bilibili-study-dark-mode .course-item {
+        background: #2a2a2a !important;
+        border-color: #444 !important;
+        color: #e0e0e0 !important;
+    }
+    
+    .bilibili-study-dark-mode .course-item:hover {
+        background: #333 !important;
     }
 `;
 
@@ -1233,8 +1364,56 @@ const FloatingWindow = (function() {
 // ==========================================
 const DetailPanel = (function() {
     const MODAL_ID = 'bilibili-study-detail-modal';
+    const THEME_KEY = 'bilibiliStudyAssistant_theme';
     let modalElement = null;
     let isOpen = false;
+    let currentTheme = 'light'; // 'light' or 'dark'
+
+    // Load theme preference
+    function loadTheme() {
+        try {
+            const saved = localStorage.getItem(THEME_KEY);
+            currentTheme = saved || 'light';
+        } catch (e) {
+            currentTheme = 'light';
+        }
+        return currentTheme;
+    }
+
+    // Save theme preference
+    function saveTheme(theme) {
+        try {
+            localStorage.setItem(THEME_KEY, theme);
+            currentTheme = theme;
+        } catch (e) {
+            console.warn('Failed to save theme preference:', e);
+        }
+    }
+
+    // Toggle theme
+    function toggleTheme() {
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        saveTheme(newTheme);
+        applyTheme(newTheme);
+    }
+
+    // Apply theme to modal
+    function applyTheme(theme) {
+        if (!modalElement) return;
+        
+        if (theme === 'dark') {
+            modalElement.classList.add('bilibili-study-dark-mode');
+        } else {
+            modalElement.classList.remove('bilibili-study-dark-mode');
+        }
+        
+        // Update toggle button icon
+        const toggleBtn = document.getElementById('bilibili-study-theme-toggle');
+        if (toggleBtn) {
+            toggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+            toggleBtn.title = theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式';
+        }
+    }
 
     // Format time as "Xh Xm" or "Xm Xs"
     function formatTime(seconds) {
@@ -1553,11 +1732,23 @@ const DetailPanel = (function() {
         modalElement = document.createElement('div');
         modalElement.id = MODAL_ID;
         modalElement.className = 'bilibili-study-modal-overlay';
+        
+        // Load saved theme
+        loadTheme();
+        
         modalElement.innerHTML = `
             <div class="bilibili-study-modal">
                 <div class="bilibili-study-modal-header">
                     <h2>学习专注助手 - 详细统计</h2>
-                    <button class="bilibili-study-modal-close" id="bilibili-study-modal-close">&times;</button>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="bilibili-study-btn bilibili-study-btn-secondary" 
+                                id="bilibili-study-theme-toggle"
+                                style="padding: 6px 12px; font-size: 18px; cursor: pointer;"
+                                title="切换主题">
+                            ${currentTheme === 'dark' ? '☀️' : '🌙'}
+                        </button>
+                        <button class="bilibili-study-modal-close" id="bilibili-study-modal-close">&times;</button>
+                    </div>
                 </div>
                 <div class="bilibili-study-modal-body">
                     ${renderModule1()}
@@ -1571,6 +1762,9 @@ const DetailPanel = (function() {
 
         document.body.appendChild(modalElement);
         isOpen = true;
+        
+        // Apply saved theme
+        applyTheme(currentTheme);
 
         // Add event listeners
         modalElement.querySelector('#bilibili-study-modal-close').addEventListener('click', close);
@@ -1579,6 +1773,15 @@ const DetailPanel = (function() {
                 close();
             }
         });
+
+        // Theme toggle button
+        const themeToggleBtn = document.getElementById('bilibili-study-theme-toggle');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleTheme();
+            });
+        }
 
         // Add keyboard listener
         document.addEventListener('keydown', handleKeyDown);
@@ -2128,11 +2331,45 @@ const InterventionController = (function() {
         if (modalState !== MODAL_STATES.NONE) return;
         modalState = MODAL_STATES.CONFIRM;
 
+        // 获取白名单课程
+        const whitelist = ConfigManager.getWhitelistArray();
+        const hasWhitelist = whitelist && whitelist.length > 0;
+        
+        let courseOptions = '';
+        if (hasWhitelist) {
+            courseOptions = `
+                <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #333;">选择要返回的课程：</p>
+                    <div id="bilibili-study-course-list" style="max-height: 200px; overflow-y: auto;">
+                        ${whitelist.map((course, index) => `
+                            <div class="course-item" 
+                                 style="padding: 8px 12px; margin: 5px 0; background: white; 
+                                        border: 1px solid #e0e0e0; border-radius: 4px; 
+                                        cursor: pointer; transition: all 0.2s;"
+                                 onclick="this.style.background='#e3f2fd'; this.style.borderColor='#00a1d6'; 
+                                          this.setAttribute('data-selected', 'true');
+                                          document.querySelectorAll('.course-item').forEach(el => {
+                                              if (el !== this) {
+                                                  el.style.background = 'white';
+                                                  el.style.borderColor = '#e0e0e0';
+                                                  el.removeAttribute('data-selected');
+                                              }
+                                          });
+                                          document.getElementById('bilibili-study-confirm-no').textContent = '返回学习：${course.name}';
+                                          document.getElementById('bilibili-study-confirm-no').setAttribute('data-bv', '${course.bv}');">
+                                <div style="font-weight: bold;">${course.name}</div>
+                                <div style="font-size: 12px; color: #666;">${course.bv}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
+
         const modal = document.createElement('div');
         modal.className = 'bilibili-study-modal-overlay';
         modal.id = 'bilibili-study-confirm-modal';
         modal.innerHTML = `
-            <div class="bilibili-study-modal" style="max-width: 400px;">
+            <div class="bilibili-study-modal" style="max-width: ${hasWhitelist ? '500px' : '400px'};">
                 <div class="bilibili-study-modal-header">
                     <h2>⚠️ 学习提醒</h2>
                 </div>
@@ -2140,12 +2377,15 @@ const InterventionController = (function() {
                     <p style="font-size: 16px; margin-bottom: 20px;">
                         您当前处于学习时段，是否确认访问无关视频页面？
                     </p>
+                    ${courseOptions}
                     <div class="bilibili-study-action-buttons">
                         <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-confirm-yes">
                             确认离开学习
                         </button>
-                        <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-confirm-no">
-                            立即返回学习
+                        <button class="bilibili-study-btn bilibili-study-btn-secondary" 
+                                id="bilibili-study-confirm-no"
+                                ${hasWhitelist ? 'disabled' : ''}>
+                            ${hasWhitelist ? '选择课程返回' : '立即返回学习'}
                         </button>
                     </div>
                 </div>
@@ -2166,17 +2406,194 @@ const InterventionController = (function() {
         });
 
         document.getElementById('bilibili-study-confirm-no').addEventListener('click', function() {
-            returnToLearning();
+            if (hasWhitelist) {
+                const selectedCourse = document.querySelector('.course-item[data-selected="true"]');
+                if (selectedCourse) {
+                    const bv = document.getElementById('bilibili-study-confirm-no').getAttribute('data-bv');
+                    window.location.href = `https://www.bilibili.com/video/${bv}`;
+                } else {
+                    alert('请先选择一个课程');
+                }
+            } else {
+                returnToLearning();
+            }
         });
 
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                returnToLearning();
+                if (hasWhitelist) {
+                    const selectedCourse = document.querySelector('.course-item[data-selected="true"]');
+                    if (selectedCourse) {
+                        const bv = document.getElementById('bilibili-study-confirm-no').getAttribute('data-bv');
+                        window.location.href = `https://www.bilibili.com/video/${bv}`;
+                    } else {
+                        returnToLearning();
+                    }
+                } else {
+                    returnToLearning();
+                }
             }
         });
     }
 
     function showStage2Modal() {
+        if (modalState !== MODAL_STATES.NONE) return;
+        modalState = MODAL_STATES.STAGE2;
+
+        // 从词汇库随机选择一个单词
+        const config = ConfigManager.get();
+        const vocabulary = config.vocabulary || [];
+        if (vocabulary.length === 0) {
+            // 如果没有词汇库，使用默认的简单单词
+            showSimpleStage2Modal();
+            return;
+        }
+
+        const randomIndex = Math.floor(Math.random() * vocabulary.length);
+        const wordPair = vocabulary[randomIndex];
+        const [chinese, english] = wordPair.split(':');
+        
+        // 创建填空单词（隐藏部分字母）
+        const hiddenWord = createHiddenWord(english);
+        
+        const modal = document.createElement('div');
+        modal.className = 'bilibili-study-modal-overlay';
+        modal.id = 'bilibili-study-stage2-modal';
+        modal.innerHTML = `
+            <div class="bilibili-study-modal" style="max-width: 450px;">
+                <div class="bilibili-study-modal-header">
+                    <h2>⏰ 学习提醒 + 单词练习</h2>
+                </div>
+                <div class="bilibili-study-modal-body">
+                    <p style="font-size: 16px; margin-bottom: 15px;">
+                        您已在无关视频停留超过5分钟，当前处于学习时段
+                    </p>
+                    <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                        请填写以下单词的英文翻译才能继续浏览：
+                    </p>
+                    
+                    <div style="text-align: center; margin-bottom: 25px;">
+                        <div style="font-size: 20px; color: #00a1d6; margin-bottom: 10px;">
+                            <strong>${chinese}</strong>
+                        </div>
+                        <div style="font-size: 18px; font-family: monospace; letter-spacing: 3px; margin-bottom: 15px;">
+                            ${hiddenWord}
+                        </div>
+                    </div>
+                    
+                    <input type="text" id="bilibili-study-stage2-word-input"
+                           placeholder="请输入英文单词"
+                           style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box;">
+                    
+                    <div id="bilibili-study-stage2-feedback" style="text-align: center; font-size: 16px; margin-bottom: 15px; min-height: 24px;"></div>
+                    
+                    <div class="bilibili-study-action-buttons" style="justify-content: center;">
+                        <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-stage2-submit">
+                            提交答案
+                        </button>
+                        <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-stage2-skip">
+                            跳过（等待30秒）
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const input = document.getElementById('bilibili-study-stage2-word-input');
+        if (input) input.focus();
+
+        let skipTimer = null;
+        let skipSeconds = 30;
+        const skipButton = document.getElementById('bilibili-study-stage2-skip');
+        
+        // 更新跳过按钮倒计时
+        function updateSkipButton() {
+            if (skipSeconds > 0) {
+                skipButton.textContent = `跳过（等待${skipSeconds}秒）`;
+                skipButton.disabled = true;
+                skipSeconds--;
+                skipTimer = setTimeout(updateSkipButton, 1000);
+            } else {
+                skipButton.textContent = '跳过';
+                skipButton.disabled = false;
+            }
+        }
+        
+        updateSkipButton();
+
+        document.getElementById('bilibili-study-stage2-submit').addEventListener('click', function() {
+            const answer = input.value.trim().toLowerCase();
+            const correctAnswer = english.toLowerCase();
+            
+            if (answer === correctAnswer) {
+                // 回答正确
+                const feedback = document.getElementById('bilibili-study-stage2-feedback');
+                feedback.innerHTML = '<span style="color: #16a34a; font-weight: bold;">✅ 回答正确！可以继续浏览</span>';
+                
+                // 记录单词练习
+                WordVerifier.recordAnswer({ chinese, english }, true);
+                StatisticsTracker.recordWordAttempt(true);
+                
+                setTimeout(() => {
+                    closeCurrentModal();
+                    if (skipTimer) clearTimeout(skipTimer);
+                }, 1000);
+            } else {
+                // 回答错误
+                const feedback = document.getElementById('bilibili-study-stage2-feedback');
+                feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误，请再试一次</span>';
+                input.value = '';
+                input.focus();
+            }
+        });
+
+        document.getElementById('bilibili-study-stage2-skip').addEventListener('click', function() {
+            if (!skipButton.disabled) {
+                closeCurrentModal();
+                if (skipTimer) clearTimeout(skipTimer);
+            }
+        });
+
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('bilibili-study-stage2-submit').click();
+            }
+        });
+
+        modal.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCurrentModal();
+                if (skipTimer) clearTimeout(skipTimer);
+            }
+        });
+    }
+
+    // 辅助函数：创建隐藏部分字母的单词
+    function createHiddenWord(word) {
+        const length = word.length;
+        const hiddenCount = Math.max(1, Math.floor(length * 0.4)); // 隐藏40%的字母
+        const hiddenIndices = new Set();
+        
+        while (hiddenIndices.size < hiddenCount) {
+            const index = Math.floor(Math.random() * length);
+            hiddenIndices.add(index);
+        }
+        
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            if (hiddenIndices.has(i)) {
+                result += '_';
+            } else {
+                result += word[i];
+            }
+        }
+        return result.split('').join(' ');
+    }
+
+    // 备用函数：如果没有词汇库，显示简单的Stage 2弹窗
+    function showSimpleStage2Modal() {
         if (modalState !== MODAL_STATES.NONE) return;
         modalState = MODAL_STATES.STAGE2;
 
@@ -2212,13 +2629,11 @@ const InterventionController = (function() {
 
         document.getElementById('bilibili-study-stage2-ok').addEventListener('click', function() {
             closeCurrentModal();
-            // lastPopupTime is already set in showPopupIfNeeded when popup is shown
         });
 
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeCurrentModal();
-                // lastPopupTime is already set in showPopupIfNeeded when popup is shown
             }
         });
     }
