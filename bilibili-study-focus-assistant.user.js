@@ -336,9 +336,10 @@ const STYLES = `
     /* Visual Interventions - Stage 1: Progressive visual effects on non-player elements */
     .bilibili-study-intervention-stage1 .bilibili-player-wrap,
     .bilibili-study-intervention-stage1 .bpx-player-container,
-    .bilibili-study-intervention-stage1 #bilibili-player {
-        filter: invert(0%) grayscale(0%);
-        opacity: 1;
+    .bilibili-study-intervention-stage1 #bilibili-player,
+    .bilibili-study-intervention-stage1 .bpx-player-video-wrap {
+        filter: invert(0%) grayscale(0%) !important;
+        opacity: 1 !important;
     }
 
     .bilibili-study-intervention-stage1 .video-container,
@@ -348,12 +349,23 @@ const STYLES = `
     .bilibili-study-intervention-stage1 .reCMD-list,
     .bilibili-study-intervention-stage1 .recommend-list,
     .bilibili-study-intervention-stage1 .sidebar,
-    .bilibili-study-intervention-stage1 .relative-ul {
+    .bilibili-study-intervention-stage1 .relative-ul,
+    .bilibili-study-intervention-stage1 .right-container,
+    .bilibili-study-intervention-stage1 .video-info-container,
+    .bilibili-study-intervention-stage1 .comment-container {
         filter: invert(0%) grayscale(0%);
         opacity: 1;
     }
 
     /* Stage 2: Peak visual effects from stage 1 + popup reminder */
+    .bilibili-study-intervention-stage2 .bilibili-player-wrap,
+    .bilibili-study-intervention-stage2 .bpx-player-container,
+    .bilibili-study-intervention-stage2 #bilibili-player,
+    .bilibili-study-intervention-stage2 .bpx-player-video-wrap {
+        filter: invert(0%) grayscale(0%) !important;
+        opacity: 1 !important;
+    }
+
     .bilibili-study-intervention-stage2 .video-container,
     .bilibili-study-intervention-stage2 .main-container,
     .bilibili-study-intervention-stage2 .left-container,
@@ -361,12 +373,23 @@ const STYLES = `
     .bilibili-study-intervention-stage2 .reCMD-list,
     .bilibili-study-intervention-stage2 .recommend-list,
     .bilibili-study-intervention-stage2 .sidebar,
-    .bilibili-study-intervention-stage2 .relative-ul {
+    .bilibili-study-intervention-stage2 .relative-ul,
+    .bilibili-study-intervention-stage2 .right-container,
+    .bilibili-study-intervention-stage2 .video-info-container,
+    .bilibili-study-intervention-stage2 .comment-container {
         filter: invert(100%) grayscale(80%);
         opacity: 0.7;
     }
 
     /* Stage 3: Same as stage 2 */
+    .bilibili-study-intervention-stage3 .bilibili-player-wrap,
+    .bilibili-study-intervention-stage3 .bpx-player-container,
+    .bilibili-study-intervention-stage3 #bilibili-player,
+    .bilibili-study-intervention-stage3 .bpx-player-video-wrap {
+        filter: invert(0%) grayscale(0%) !important;
+        opacity: 1 !important;
+    }
+
     .bilibili-study-intervention-stage3 .video-container,
     .bilibili-study-intervention-stage3 .main-container,
     .bilibili-study-intervention-stage3 .left-container,
@@ -374,12 +397,23 @@ const STYLES = `
     .bilibili-study-intervention-stage3 .reCMD-list,
     .bilibili-study-intervention-stage3 .recommend-list,
     .bilibili-study-intervention-stage3 .sidebar,
-    .bilibili-study-intervention-stage3 .relative-ul {
+    .bilibili-study-intervention-stage3 .relative-ul,
+    .bilibili-study-intervention-stage3 .right-container,
+    .bilibili-study-intervention-stage3 .video-info-container,
+    .bilibili-study-intervention-stage3 .comment-container {
         filter: invert(100%) grayscale(80%);
         opacity: 0.7;
     }
 
     /* Stage 4: Warning effects with red flashing border */
+    .bilibili-study-intervention-stage4 .bilibili-player-wrap,
+    .bilibili-study-intervention-stage4 .bpx-player-container,
+    .bilibili-study-intervention-stage4 #bilibili-player,
+    .bilibili-study-intervention-stage4 .bpx-player-video-wrap {
+        filter: invert(0%) grayscale(0%) !important;
+        opacity: 1 !important;
+    }
+
     .bilibili-study-intervention-stage4 .video-container,
     .bilibili-study-intervention-stage4 .main-container,
     .bilibili-study-intervention-stage4 .left-container,
@@ -387,7 +421,10 @@ const STYLES = `
     .bilibili-study-intervention-stage4 .reCMD-list,
     .bilibili-study-intervention-stage4 .recommend-list,
     .bilibili-study-intervention-stage4 .sidebar,
-    .bilibili-study-intervention-stage4 .relative-ul {
+    .bilibili-study-intervention-stage4 .relative-ul,
+    .bilibili-study-intervention-stage4 .right-container,
+    .bilibili-study-intervention-stage4 .video-info-container,
+    .bilibili-study-intervention-stage4 .comment-container {
         filter: invert(100%) grayscale(80%);
         opacity: 0.6;
         outline: 3px solid #dc2626;
@@ -2124,8 +2161,8 @@ const InterventionController = (function() {
                 window.__bilibiliStudyAppState.distractionStartTime = Date.now();
                 window.__bilibiliStudyAppState.currentStage = 1;
             }
-            // Note: lastPopupTime is NOT set here - Stage 0 has interval=0
-            // The timer starts from when distractionStartTime is set
+            // Start the popup timer from this point
+            lastPopupTime = Date.now();
         });
 
         document.getElementById('bilibili-study-confirm-no').addEventListener('click', function() {
@@ -2175,13 +2212,13 @@ const InterventionController = (function() {
 
         document.getElementById('bilibili-study-stage2-ok').addEventListener('click', function() {
             closeCurrentModal();
-            lastPopupTime = Date.now();
+            // lastPopupTime is already set in showPopupIfNeeded when popup is shown
         });
 
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeCurrentModal();
-                lastPopupTime = Date.now();
+                // lastPopupTime is already set in showPopupIfNeeded when popup is shown
             }
         });
     }
@@ -2213,7 +2250,7 @@ const InterventionController = (function() {
         document.getElementById('bilibili-study-word-submit').addEventListener('click', handleWordSubmit);
         document.getElementById('bilibili-study-word-skip').addEventListener('click', function() {
             closeCurrentModal();
-            lastPopupTime = Date.now();
+            // lastPopupTime is already set in showPopupIfNeeded when popup is shown
         });
 
         input.addEventListener('keypress', function(e) {
@@ -2225,7 +2262,7 @@ const InterventionController = (function() {
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeCurrentModal();
-                lastPopupTime = Date.now();
+                // lastPopupTime is already set in showPopupIfNeeded when popup is shown
             }
         });
     }
@@ -2285,9 +2322,8 @@ const InterventionController = (function() {
 
         if (correct) {
             feedback.innerHTML = '<span style="color: #16a34a; font-weight: bold;">✅ 回答正确！</span>';
-            // Close immediately without delay to allow next popup
+            // Close immediately - lastPopupTime already set when popup was shown
             closeCurrentModal();
-            lastPopupTime = Date.now();
         } else {
             feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误</span>';
             revealedLetters++;
@@ -2300,7 +2336,7 @@ const InterventionController = (function() {
                 setTimeout(() => {
                     if (modalState === MODAL_STATES.WORD_VERIFY) {
                         closeCurrentModal();
-                        lastPopupTime = Date.now();
+                        // lastPopupTime already set when popup was shown
                     }
                 }, waitTime);
             } else {
@@ -2315,7 +2351,7 @@ const InterventionController = (function() {
                     document.getElementById('bilibili-study-word-submit').addEventListener('click', handleWordSubmit);
                     document.getElementById('bilibili-study-word-skip').addEventListener('click', function() {
                         closeCurrentModal();
-                        lastPopupTime = Date.now();
+                        // lastPopupTime already set when popup was shown
                     });
                     newInput.addEventListener('keypress', function(e) {
                         if (e.key === 'Enter') {
@@ -2359,6 +2395,23 @@ const InterventionController = (function() {
         wordRevealTime = 0;
     }
 
+    // Track page visibility for accurate timing
+    let lastVisibilityChange = 0;
+    let totalHiddenTime = 0;
+
+    function handleVisibilityChange() {
+        if (document.hidden) {
+            lastVisibilityChange = Date.now();
+        } else {
+            if (lastVisibilityChange > 0) {
+                totalHiddenTime += Date.now() - lastVisibilityChange;
+                lastVisibilityChange = 0;
+            }
+        }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     function check() {
         const state = window.__bilibiliStudyAppState;
         if (!state) return;
@@ -2371,6 +2424,18 @@ const InterventionController = (function() {
 
         if (!isVideoPage || !isPageActive) {
             return;
+        }
+
+        // Adjust for time spent hidden
+        if (totalHiddenTime > 0) {
+            if (state.distractionStartTime) {
+                state.distractionStartTime += totalHiddenTime;
+            }
+            // Also adjust lastPopupTime to maintain correct intervals
+            if (lastPopupTime > 0) {
+                lastPopupTime += totalHiddenTime;
+            }
+            totalHiddenTime = 0;
         }
 
         if (!isStudyTime) {
@@ -2437,8 +2502,38 @@ const InterventionController = (function() {
 (function() {
     'use strict';
 
-    // Initialize app state
+    // ==========================================
+    // Tab ID Management - Isolate state per tab
+    // ==========================================
+    function generateTabId() {
+        const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        try {
+            sessionStorage.setItem('bilibiliStudyAssistant_tabId', tabId);
+        } catch (e) {
+            console.warn('Failed to save tab ID to sessionStorage:', e);
+        }
+        return tabId;
+    }
+
+    function getTabId() {
+        try {
+            let tabId = sessionStorage.getItem('bilibiliStudyAssistant_tabId');
+            if (!tabId) {
+                tabId = generateTabId();
+            }
+            return tabId;
+        } catch (e) {
+            console.warn('Failed to get tab ID from sessionStorage:', e);
+            return 'tab_fallback_' + Math.random().toString(36).substr(2, 9);
+        }
+    }
+
+    const TAB_ID = getTabId();
+    console.log('[B站学习助手] Tab ID:', TAB_ID);
+
+    // Initialize app state with tab ID
     window.__bilibiliStudyAppState = {
+        tabId: TAB_ID,
         currentStage: 0,
         distractionStartTime: null,
         isStudying: true,
