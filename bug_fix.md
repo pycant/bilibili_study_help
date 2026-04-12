@@ -2,9 +2,10 @@
 
 ## 版本记录
 
-- v1.1.1 (当前): 修复所有核心Bug
-- v1.1.0: 修复部分Bug + 新增功能
-- v1.0.0: 初始版本
+- v1.0.4 (当前): 修复弹窗全屏显示、暗色模式适配、课程选择无反应
+- v1.0.3: 完整暗色模式支持、单词填空练习、课程选择菜单
+- v1.0.2: 修复弹窗计时逻辑、单词验证延迟、页面可见性处理
+- v1.0.1: 初始版本
 
 ---
 
@@ -183,6 +184,138 @@ window.__bilibiliStudyAppState = {
 ```
 
 **代码位置**：`STYLES` 常量中的 CSS 规则
+
+**修复状态**：✅ 已完成
+
+---
+
+## 四、v1.1.2 修复详情
+
+### 4.1 ✅ 学习提醒中课程选择后返回学习无反应
+
+**问题描述**：
+点击白名单课程后，点击"返回学习"按钮无任何反应。
+
+**根因分析**：
+1. 内联 `onclick` 中使用了单引号包裹模板字符串 `${course.name}`，导致变量未求值，`textContent` 和 `setAttribute` 调用的是字面字符串
+2. 按钮使用了 HTML `disabled` 属性，导致 JavaScript `addEventListener` 注册的 click 事件无法触发
+
+**修复方案**：
+1. 移除内联 `onclick`，改用 `data-bv`、`data-name` 属性存储课程信息
+2. 使用事件委托（`courseList.addEventListener`）处理课程点击
+3. 移除 `disabled` 属性，改用 `opacity: 0.5; cursor: not-allowed` 样式禁用视觉
+4. 课程选中后动态更新按钮文字并恢复可点击状态
+
+**关键代码**：
+
+```javascript
+// 课程列表使用 data-* 属性
+${whitelist.map((course, index) => `
+    <div class="course-item" 
+         data-index="${index}"
+         data-bv="${course.bv.replace(/"/g, '&quot;')}"
+         data-name="${course.name.replace(/"/g, '&quot;')}"
+         ...>
+        <div style="font-weight: bold;">${course.name}</div>
+        ...
+    </div>
+`).join('')}
+
+// 事件委托处理选择
+courseList.addEventListener('click', function(e) {
+    const item = e.target.closest('.course-item');
+    if (!item) return;
+    // 清除所有选中状态
+    courseList.querySelectorAll('.course-item').forEach(el => {...});
+    // 标记当前选中
+    item.style.background = '#e3f2fd';
+    item.setAttribute('data-selected', 'true');
+    // 更新返回按钮
+    returnBtn.textContent = `返回学习：${name}`;
+    returnBtn.setAttribute('data-bv', bv);
+});
+```
+
+**代码位置**：`showConfirmModal()` (约第 2330-2470 行)
+
+**修复状态**：✅ 已完成
+
+---
+
+### 4.2 ✅ 学习提醒没有暗色模式适配
+
+**问题描述**：
+切换到暗色模式后，三个干预弹窗（确认弹窗、Stage2 弹窗、单词验证弹窗）仍显示亮色样式，只有统计详情面板有暗色模式。
+
+**根因分析**：
+`applyTheme()` 只对 `modalElement`（统计详情面板）添加/移除 `bilibili-study-dark-mode` class，干预弹窗在创建时未应用该 class。
+
+**修复方案**：
+1. 创建辅助函数 `applyCurrentThemeToModal(el)`，通过 `DetailPanel.getCurrentTheme()` 获取当前主题
+2. 在所有干预弹窗（确认弹窗、Stage2、单词验证）创建后立即调用该函数
+3. 修复单词验证弹窗中提示文字的暗色颜色（移除 inline `style="color: #666"`，改用 CSS class）
+
+**关键代码**：
+
+```javascript
+function applyCurrentThemeToModal(el) {
+    if (!el) return;
+    const theme = DetailPanel.getCurrentTheme ? DetailPanel.getCurrentTheme() : 'light';
+    if (theme === 'dark') {
+        el.classList.add('bilibili-study-dark-mode');
+    } else {
+        el.classList.remove('bilibili-study-dark-mode');
+    }
+}
+
+// 所有弹窗创建后调用
+getModalContainer().appendChild(modal);
+applyCurrentThemeToModal(modal);
+```
+
+**代码位置**：
+- `applyCurrentThemeToModal()` (第 2233 行)
+- `showConfirmModal()` (第 2418 行)
+- `showStage2Modal()` (第 2569 行)
+- `showSimpleStage2Modal()` (第 2693 行)
+- `showWordVerifierModal()` (第 2730 行)
+
+**修复状态**：✅ 已完成
+
+---
+
+### 4.3 ✅ 全屏模式下没有学习提醒弹窗
+
+**问题描述**：
+当B站播放器处于全屏模式时，学习提醒弹窗不显示。
+
+**根因分析**：
+B站播放器使用浏览器 Fullscreen API 全屏（将播放器元素设置为 `document.fullscreenElement`）。弹窗 append 到 `document.body`，其 `z-index` 无法覆盖在 `fullscreenElement` 之上。
+
+**修复方案**：
+创建 `getModalContainer()` 函数，检测当前是否有全屏元素，返回全屏元素（若有）或 `document.body`（若没有）。所有干预弹窗改用 `getModalContainer().appendChild(modal)` 替代 `document.body.appendChild(modal)`。
+
+**关键代码**：
+
+```javascript
+function getModalContainer() {
+    const fsEl = document.fullscreenElement ||
+                 document.webkitFullscreenElement ||
+                 document.mozFullScreenElement ||
+                 document.msFullscreenElement;
+    return fsEl || document.body;
+}
+
+// 所有干预弹窗使用
+getModalContainer().appendChild(modal);
+```
+
+**代码位置**：
+- `getModalContainer()` (第 2247 行)
+- `showConfirmModal()` (第 2417 行)
+- `showStage2Modal()` (第 2568 行)
+- `showSimpleStage2Modal()` (第 2692 行)
+- `showWordVerifierModal()` (第 2729 行)
 
 **修复状态**：✅ 已完成
 

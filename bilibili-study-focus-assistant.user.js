@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.3
+// @version      1.0.4
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -1914,7 +1914,8 @@ const DetailPanel = (function() {
     return {
         open,
         close,
-        isOpen: function() { return isOpen; }
+        isOpen: function() { return isOpen; },
+        getCurrentTheme: function() { return currentTheme; }
     };
 })();
 
@@ -2224,6 +2225,33 @@ const InterventionController = (function() {
     let currentWord = null;
     let revealedLetters = 0;
 
+    /**
+     * Bug2修复：将当前 DetailPanel 主题应用到给定弹窗元素
+     * DetailPanel 的 dark-mode CSS 类通过层叠样式覆盖子元素，
+     * 因此只需在弹窗根节点加上同一个 class 即可复用所有暗色样式。
+     */
+    function applyCurrentThemeToModal(el) {
+        if (!el) return;
+        const theme = DetailPanel.getCurrentTheme ? DetailPanel.getCurrentTheme() : 'light';
+        if (theme === 'dark') {
+            el.classList.add('bilibili-study-dark-mode');
+        } else {
+            el.classList.remove('bilibili-study-dark-mode');
+        }
+    }
+
+    /**
+     * Bug3修复：全屏时将弹窗挂载到 fullscreenElement 内部，
+     * 否则挂载到 document.body。这样弹窗才能显示在全屏层之上。
+     */
+    function getModalContainer() {
+        const fsEl = document.fullscreenElement ||
+                     document.webkitFullscreenElement ||
+                     document.mozFullScreenElement ||
+                     document.msFullscreenElement;
+        return fsEl || document.body;
+    }
+
     function getCurrentStage(distractionDuration) {
         const config = ConfigManager.get();
         const stages = config.interventionStages || [];
@@ -2337,30 +2365,24 @@ const InterventionController = (function() {
         
         let courseOptions = '';
         if (hasWhitelist) {
+            // 使用 data-index 属性而不是内联 onclick，避免模板字符串嵌套和引号冲突
+            const courseItems = whitelist.map((course, index) => `
+                            <div class="course-item" 
+                                 data-index="${index}"
+                                 data-bv="${course.bv.replace(/"/g, '&quot;')}"
+                                 data-name="${course.name.replace(/"/g, '&quot;')}"
+                                 style="padding: 8px 12px; margin: 5px 0; background: white; 
+                                        border: 1px solid #e0e0e0; border-radius: 4px; 
+                                        cursor: pointer; transition: all 0.2s;">
+                                <div style="font-weight: bold;">${course.name}</div>
+                                <div style="font-size: 12px; color: #666;">${course.bv}</div>
+                            </div>
+            `).join('');
             courseOptions = `
                 <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 6px;">
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #333;">选择要返回的课程：</p>
                     <div id="bilibili-study-course-list" style="max-height: 200px; overflow-y: auto;">
-                        ${whitelist.map((course, index) => `
-                            <div class="course-item" 
-                                 style="padding: 8px 12px; margin: 5px 0; background: white; 
-                                        border: 1px solid #e0e0e0; border-radius: 4px; 
-                                        cursor: pointer; transition: all 0.2s;"
-                                 onclick="this.style.background='#e3f2fd'; this.style.borderColor='#00a1d6'; 
-                                          this.setAttribute('data-selected', 'true');
-                                          document.querySelectorAll('.course-item').forEach(el => {
-                                              if (el !== this) {
-                                                  el.style.background = 'white';
-                                                  el.style.borderColor = '#e0e0e0';
-                                                  el.removeAttribute('data-selected');
-                                              }
-                                          });
-                                          document.getElementById('bilibili-study-confirm-no').textContent = '返回学习：${course.name}';
-                                          document.getElementById('bilibili-study-confirm-no').setAttribute('data-bv', '${course.bv}');">
-                                <div style="font-weight: bold;">${course.name}</div>
-                                <div style="font-size: 12px; color: #666;">${course.bv}</div>
-                            </div>
-                        `).join('')}
+                        ${courseItems}
                     </div>
                 </div>`;
         }
@@ -2384,7 +2406,7 @@ const InterventionController = (function() {
                         </button>
                         <button class="bilibili-study-btn bilibili-study-btn-secondary" 
                                 id="bilibili-study-confirm-no"
-                                ${hasWhitelist ? 'disabled' : ''}>
+                                style="${hasWhitelist ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
                             ${hasWhitelist ? '选择课程返回' : '立即返回学习'}
                         </button>
                     </div>
@@ -2392,7 +2414,42 @@ const InterventionController = (function() {
             </div>
         `;
 
-        document.body.appendChild(modal);
+        getModalContainer().appendChild(modal);
+        applyCurrentThemeToModal(modal);
+
+        // 课程列表点击事件 - 使用事件委托，避免内联onclick的嵌套模板字符串问题
+        if (hasWhitelist) {
+            const courseList = document.getElementById('bilibili-study-course-list');
+            if (courseList) {
+                courseList.addEventListener('click', function(e) {
+                    const item = e.target.closest('.course-item');
+                    if (!item) return;
+
+                    // 清除所有选中状态
+                    courseList.querySelectorAll('.course-item').forEach(el => {
+                        el.style.background = 'white';
+                        el.style.borderColor = '#e0e0e0';
+                        el.removeAttribute('data-selected');
+                    });
+
+                    // 标记当前选中
+                    item.style.background = '#e3f2fd';
+                    item.style.borderColor = '#00a1d6';
+                    item.setAttribute('data-selected', 'true');
+
+                    // 更新返回按钮
+                    const returnBtn = document.getElementById('bilibili-study-confirm-no');
+                    if (returnBtn) {
+                        const bv = item.getAttribute('data-bv');
+                        const name = item.getAttribute('data-name');
+                        returnBtn.textContent = `返回学习：${name}`;
+                        returnBtn.setAttribute('data-bv', bv);
+                        returnBtn.style.opacity = '1';
+                        returnBtn.style.cursor = 'pointer';
+                    }
+                });
+            }
+        }
 
         document.getElementById('bilibili-study-confirm-yes').addEventListener('click', function() {
             closeCurrentModal();
@@ -2409,8 +2466,12 @@ const InterventionController = (function() {
             if (hasWhitelist) {
                 const selectedCourse = document.querySelector('.course-item[data-selected="true"]');
                 if (selectedCourse) {
-                    const bv = document.getElementById('bilibili-study-confirm-no').getAttribute('data-bv');
-                    window.location.href = `https://www.bilibili.com/video/${bv}`;
+                    const bv = this.getAttribute('data-bv');
+                    if (bv) {
+                        window.location.href = `https://www.bilibili.com/video/${bv}`;
+                    } else {
+                        returnToLearning();
+                    }
                 } else {
                     alert('请先选择一个课程');
                 }
@@ -2424,8 +2485,13 @@ const InterventionController = (function() {
                 if (hasWhitelist) {
                     const selectedCourse = document.querySelector('.course-item[data-selected="true"]');
                     if (selectedCourse) {
-                        const bv = document.getElementById('bilibili-study-confirm-no').getAttribute('data-bv');
-                        window.location.href = `https://www.bilibili.com/video/${bv}`;
+                        const returnBtn = document.getElementById('bilibili-study-confirm-no');
+                        const bv = returnBtn ? returnBtn.getAttribute('data-bv') : null;
+                        if (bv) {
+                            window.location.href = `https://www.bilibili.com/video/${bv}`;
+                        } else {
+                            returnToLearning();
+                        }
                     } else {
                         returnToLearning();
                     }
@@ -2499,7 +2565,8 @@ const InterventionController = (function() {
             </div>
         `;
 
-        document.body.appendChild(modal);
+        getModalContainer().appendChild(modal);
+        applyCurrentThemeToModal(modal);
 
         const input = document.getElementById('bilibili-study-stage2-word-input');
         if (input) input.focus();
@@ -2621,7 +2688,9 @@ const InterventionController = (function() {
             </div>
         `;
 
-        document.body.appendChild(modal);
+
+        getModalContainer().appendChild(modal);
+        applyCurrentThemeToModal(modal);
 
         document.getElementById('bilibili-study-stage2-return').addEventListener('click', function() {
             returnToLearning();
@@ -2657,7 +2726,8 @@ const InterventionController = (function() {
         modal.id = 'bilibili-study-word-modal';
         renderWordModalContent(modal, word, 0);
 
-        document.body.appendChild(modal);
+        getModalContainer().appendChild(modal);
+        applyCurrentThemeToModal(modal);
 
         const input = document.getElementById('bilibili-study-word-input');
         if (input) input.focus();
@@ -2687,7 +2757,7 @@ const InterventionController = (function() {
         if (!body) return;
 
         const displayWord = getDisplayWord(word.english, revealedCount);
-        const hintText = revealedCount > 0 ? `<small style="color: #666;">提示: ${displayWord}</small>` : '';
+        const hintText = revealedCount > 0 ? `<small class="bilibili-study-hint-text">提示: ${displayWord}</small>` : '';
 
         body.innerHTML = `
             <p style="font-size: 18px; margin-bottom: 20px; text-align: center;">
