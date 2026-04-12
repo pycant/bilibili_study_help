@@ -166,7 +166,7 @@
 
 ## 贡献者
 
-- 开发者：Your Name
+- 开发者：pycant
 - 测试者：Community
 
 ---
