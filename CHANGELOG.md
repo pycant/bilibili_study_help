@@ -1,5 +1,32 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.0.5] - 2026-04-13
+
+### 功能改进 ✨
+
+#### 统一分心阶段弹窗为渐进式单词验证
+- **统一弹窗类型**：移除 `showStage2Modal()` 和 `showSimpleStage2Modal()`，所有分心阶段（Stage 2/3/4）统一使用 `showWordVerifierModal()`
+- **渐进式揭示逻辑**：
+  - 初始只显示中文释义，所有英文字母为下划线
+  - 输入正确直接关闭弹窗
+  - 输入错误后每次随机揭示1-3个新字母作为提示
+  - 全部字母揭示后固定显示6秒用于记忆，然后自动关闭进入下一轮计时
+- **随机字母揭示**：使用 Fisher-Yates 部分洗牌算法随机选择未揭示的字母位置
+- **记忆模式**：全部揭示后输入框禁用，显示完整单词和记忆倒计时提示
+- **揭示进度追踪**：显示"已揭示 X/Y 个字母"的进度指示
+
+### 代码重构 🔄
+
+- 移除 `showStage2Modal()`、`showSimpleStage2Modal()`、`createHiddenWord()` 三个函数
+- 移除 `MODAL_STATES.STAGE2` 状态（统一使用 `WORD_VERIFY`）
+- `revealedLetters` 计数器改为 `revealedIndices`（Set），支持随机位置揭示
+- 重写 `renderWordModalContent()` 支持渐进式渲染
+- 重写 `getDisplayWord()` 基于索引集合生成展示
+- 重写 `handleWordSubmit()` 实现渐进式揭示+记忆模式逻辑
+- `closeCurrentModal()` 移除对 stage2Modal 的引用
+
+---
+
 ## [1.0.4] - 2026-04-12
 
 ### Bug修复 🐛
@@ -212,4 +239,4 @@ MIT License
 
 ---
 
-最后更新：2026-04-12
+最后更新：2026-04-13

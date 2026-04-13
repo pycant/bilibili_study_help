@@ -2,7 +2,8 @@
 
 ## 版本记录
 
-- v1.0.4 (当前): 修复弹窗全屏显示、暗色模式适配、课程选择无反应
+- v1.0.5 (当前): 统一分心阶段弹窗为渐进式单词验证，重构弹窗逻辑
+- v1.0.4: 修复弹窗全屏显示、暗色模式适配、课程选择无反应
 - v1.0.3: 完整暗色模式支持、单词填空练习、课程选择菜单
 - v1.0.2: 修复弹窗计时逻辑、单词验证延迟、页面可见性处理
 - v1.0.1: 初始版本
@@ -316,6 +317,58 @@ getModalContainer().appendChild(modal);
 - `showStage2Modal()` (第 2568 行)
 - `showSimpleStage2Modal()` (第 2692 行)
 - `showWordVerifierModal()` (第 2729 行)
+
+**修复状态**：✅ 已完成
+
+---
+
+## 五、v1.0.5 修改详情
+
+### 5.1 ✅ 统一分心阶段弹窗为渐进式单词验证
+
+**问题描述**：
+Stage 2 使用 `showStage2Modal()`（填空练习），Stage 3/4 使用 `showWordVerifierModal()`（单词验证），弹窗逻辑不统一。且原有单词验证逻辑不符合渐进式学习习惯——错误后从左到右逐个揭示字母，而非随机揭示。
+
+**修改方案**：
+
+1. **统一弹窗类型**：移除 `showStage2Modal()`、`showSimpleStage2Modal()`、`createHiddenWord()`，所有分心阶段统一使用 `showWordVerifierModal()`
+2. **渐进式揭示逻辑**：
+   - 初始：只显示中文释义，所有英文字母为下划线 `_`
+   - 输入正确：直接关闭弹窗
+   - 输入错误：每次随机揭示1-3个新字母作为提示
+   - 全部字母揭示：固定显示完整单词6秒用于记忆，然后自动关闭，重置 `lastPopupTime` 进入下一轮
+3. **随机揭示算法**：使用 Fisher-Yates 部分洗牌从未揭示位置中随机选取
+4. **数据结构变更**：`revealedLetters`（计数器）→ `revealedIndices`（Set），支持随机位置揭示
+5. **移除 `MODAL_STATES.STAGE2`**：统一使用 `WORD_VERIFY`
+6. **`closeCurrentModal()` 简化**：移除对 `stage2Modal` 的引用
+
+**关键代码**：
+
+```javascript
+// 渐进式揭示 - 每次答错随机揭示1-3个新字母
+const unrevealedIndices = [];
+for (let i = 0; i < totalLength; i++) {
+    if (!revealedIndices.has(i)) unrevealedIndices.push(i);
+}
+const revealCount = Math.min(
+    Math.floor(Math.random() * 3) + 1,
+    unrevealedIndices.length
+);
+// Fisher-Yates 部分洗牌
+for (let i = unrevealedIndices.length - 1; i > 0 && revealCount > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [unrevealedIndices[i], unrevealedIndices[j]] = [unrevealedIndices[j], unrevealedIndices[i]];
+}
+const toReveal = unrevealedIndices.slice(0, revealCount);
+toReveal.forEach(idx => revealedIndices.add(idx));
+```
+
+**代码位置**：
+- `showWordVerifierModal()` — 统一弹窗入口
+- `renderWordModalContent()` — 渐进式弹窗内容渲染
+- `getDisplayWord()` — 基于索引集合生成展示
+- `handleWordSubmit()` — 渐进式揭示+记忆模式逻辑
+- `showPopupIfNeeded()` — Stage 2/3/4 统一调用
 
 **修复状态**：✅ 已完成
 

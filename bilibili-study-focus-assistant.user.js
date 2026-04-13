@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.4
+// @version      1.0.5
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -2215,7 +2215,6 @@ const InterventionController = (function() {
     const MODAL_STATES = {
         NONE: 'none',
         CONFIRM: 'confirm',
-        STAGE2: 'stage2',
         WORD_VERIFY: 'wordVerify'
     };
 
@@ -2223,7 +2222,7 @@ const InterventionController = (function() {
     let lastPopupTime = 0;
     let wordRevealTime = 0;
     let currentWord = null;
-    let revealedLetters = 0;
+    let revealedIndices = new Set();
 
     /**
      * Bug2修复：将当前 DetailPanel 主题应用到给定弹窗元素
@@ -2335,11 +2334,9 @@ const InterventionController = (function() {
 
     function closeCurrentModal() {
         const confirmModal = document.getElementById('bilibili-study-confirm-modal');
-        const stage2Modal = document.getElementById('bilibili-study-stage2-modal');
         const wordModal = document.getElementById('bilibili-study-word-modal');
 
         if (confirmModal) confirmModal.remove();
-        if (stage2Modal) stage2Modal.remove();
         if (wordModal) wordModal.remove();
 
         modalState = MODAL_STATES.NONE;
@@ -2502,214 +2499,8 @@ const InterventionController = (function() {
         });
     }
 
-    function showStage2Modal() {
-        if (modalState !== MODAL_STATES.NONE) return;
-        modalState = MODAL_STATES.STAGE2;
-
-        // 从词汇库随机选择一个单词
-        const config = ConfigManager.get();
-        const vocabulary = config.vocabulary || [];
-        if (vocabulary.length === 0) {
-            // 如果没有词汇库，使用默认的简单单词
-            showSimpleStage2Modal();
-            return;
-        }
-
-        const randomIndex = Math.floor(Math.random() * vocabulary.length);
-        const wordPair = vocabulary[randomIndex];
-        const [chinese, english] = wordPair.split(':');
-        
-        // 创建填空单词（隐藏部分字母）
-        const hiddenWord = createHiddenWord(english);
-        
-        const modal = document.createElement('div');
-        modal.className = 'bilibili-study-modal-overlay';
-        modal.id = 'bilibili-study-stage2-modal';
-        modal.innerHTML = `
-            <div class="bilibili-study-modal" style="max-width: 450px;">
-                <div class="bilibili-study-modal-header">
-                    <h2>⏰ 学习提醒 + 单词练习</h2>
-                </div>
-                <div class="bilibili-study-modal-body">
-                    <p style="font-size: 16px; margin-bottom: 15px;">
-                        您已在无关视频停留超过5分钟，当前处于学习时段
-                    </p>
-                    <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
-                        请填写以下单词的英文翻译才能继续浏览：
-                    </p>
-                    
-                    <div style="text-align: center; margin-bottom: 25px;">
-                        <div style="font-size: 20px; color: #00a1d6; margin-bottom: 10px;">
-                            <strong>${chinese}</strong>
-                        </div>
-                        <div style="font-size: 18px; font-family: monospace; letter-spacing: 3px; margin-bottom: 15px;">
-                            ${hiddenWord}
-                        </div>
-                    </div>
-                    
-                    <input type="text" id="bilibili-study-stage2-word-input"
-                           placeholder="请输入英文单词"
-                           style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box;">
-                    
-                    <div id="bilibili-study-stage2-feedback" style="text-align: center; font-size: 16px; margin-bottom: 15px; min-height: 24px;"></div>
-                    
-                    <div class="bilibili-study-action-buttons" style="justify-content: center;">
-                        <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-stage2-submit">
-                            提交答案
-                        </button>
-                        <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-stage2-skip">
-                            跳过（等待30秒）
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        getModalContainer().appendChild(modal);
-        applyCurrentThemeToModal(modal);
-
-        const input = document.getElementById('bilibili-study-stage2-word-input');
-        if (input) input.focus();
-
-        let skipTimer = null;
-        let skipSeconds = 30;
-        const skipButton = document.getElementById('bilibili-study-stage2-skip');
-        
-        // 更新跳过按钮倒计时
-        function updateSkipButton() {
-            if (skipSeconds > 0) {
-                skipButton.textContent = `跳过（等待${skipSeconds}秒）`;
-                skipButton.disabled = true;
-                skipSeconds--;
-                skipTimer = setTimeout(updateSkipButton, 1000);
-            } else {
-                skipButton.textContent = '跳过';
-                skipButton.disabled = false;
-            }
-        }
-        
-        updateSkipButton();
-
-        document.getElementById('bilibili-study-stage2-submit').addEventListener('click', function() {
-            const answer = input.value.trim().toLowerCase();
-            const correctAnswer = english.toLowerCase();
-            
-            if (answer === correctAnswer) {
-                // 回答正确
-                const feedback = document.getElementById('bilibili-study-stage2-feedback');
-                feedback.innerHTML = '<span style="color: #16a34a; font-weight: bold;">✅ 回答正确！可以继续浏览</span>';
-                
-                // 记录单词练习
-                WordVerifier.recordAnswer({ chinese, english }, true);
-                StatisticsTracker.recordWordAttempt(true);
-                
-                setTimeout(() => {
-                    closeCurrentModal();
-                    if (skipTimer) clearTimeout(skipTimer);
-                }, 1000);
-            } else {
-                // 回答错误
-                const feedback = document.getElementById('bilibili-study-stage2-feedback');
-                feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误，请再试一次</span>';
-                input.value = '';
-                input.focus();
-            }
-        });
-
-        document.getElementById('bilibili-study-stage2-skip').addEventListener('click', function() {
-            if (!skipButton.disabled) {
-                closeCurrentModal();
-                if (skipTimer) clearTimeout(skipTimer);
-            }
-        });
-
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('bilibili-study-stage2-submit').click();
-            }
-        });
-
-        modal.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeCurrentModal();
-                if (skipTimer) clearTimeout(skipTimer);
-            }
-        });
-    }
-
-    // 辅助函数：创建隐藏部分字母的单词
-    function createHiddenWord(word) {
-        const length = word.length;
-        const hiddenCount = Math.max(1, Math.floor(length * 0.4)); // 隐藏40%的字母
-        const hiddenIndices = new Set();
-        
-        while (hiddenIndices.size < hiddenCount) {
-            const index = Math.floor(Math.random() * length);
-            hiddenIndices.add(index);
-        }
-        
-        let result = '';
-        for (let i = 0; i < length; i++) {
-            if (hiddenIndices.has(i)) {
-                result += '_';
-            } else {
-                result += word[i];
-            }
-        }
-        return result.split('').join(' ');
-    }
-
-    // 备用函数：如果没有词汇库，显示简单的Stage 2弹窗
-    function showSimpleStage2Modal() {
-        if (modalState !== MODAL_STATES.NONE) return;
-        modalState = MODAL_STATES.STAGE2;
-
-        const modal = document.createElement('div');
-        modal.className = 'bilibili-study-modal-overlay';
-        modal.id = 'bilibili-study-stage2-modal';
-        modal.innerHTML = `
-            <div class="bilibili-study-modal" style="max-width: 400px;">
-                <div class="bilibili-study-modal-header">
-                    <h2>⏰ 学习提醒</h2>
-                </div>
-                <div class="bilibili-study-modal-body">
-                    <p style="font-size: 16px; margin-bottom: 20px;">
-                        您已在无关视频停留超过5分钟，当前处于学习时段，请尽快返回学习
-                    </p>
-                    <div class="bilibili-study-action-buttons" style="justify-content: center;">
-                        <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-stage2-return">
-                            返回学习
-                        </button>
-                        <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-stage2-ok">
-                            知道了
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-
-        getModalContainer().appendChild(modal);
-        applyCurrentThemeToModal(modal);
-
-        document.getElementById('bilibili-study-stage2-return').addEventListener('click', function() {
-            returnToLearning();
-        });
-
-        document.getElementById('bilibili-study-stage2-ok').addEventListener('click', function() {
-            closeCurrentModal();
-        });
-
-        modal.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeCurrentModal();
-            }
-        });
-    }
-
     function showWordVerifierModal() {
         if (modalState !== MODAL_STATES.NONE) return;
-        modalState = MODAL_STATES.WORD_VERIFY;
 
         const word = WordVerifier.selectWord();
         if (!word) {
@@ -2717,14 +2508,15 @@ const InterventionController = (function() {
             return;
         }
 
+        modalState = MODAL_STATES.WORD_VERIFY;
         currentWord = word;
-        revealedLetters = 0;
+        revealedIndices = new Set();
         wordRevealTime = 0;
 
         const modal = document.createElement('div');
         modal.className = 'bilibili-study-modal-overlay';
         modal.id = 'bilibili-study-word-modal';
-        renderWordModalContent(modal, word, 0);
+        renderWordModalContent(modal, word, revealedIndices);
 
         getModalContainer().appendChild(modal);
         applyCurrentThemeToModal(modal);
@@ -2735,7 +2527,6 @@ const InterventionController = (function() {
         document.getElementById('bilibili-study-word-submit').addEventListener('click', handleWordSubmit);
         document.getElementById('bilibili-study-word-skip').addEventListener('click', function() {
             closeCurrentModal();
-            // lastPopupTime is already set in showPopupIfNeeded when popup is shown
         });
 
         input.addEventListener('keypress', function(e) {
@@ -2747,30 +2538,62 @@ const InterventionController = (function() {
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeCurrentModal();
-                // lastPopupTime is already set in showPopupIfNeeded when popup is shown
             }
         });
     }
 
-    function renderWordModalContent(modal, word, revealedCount) {
+    /**
+     * 渐进式学习弹窗内容渲染
+     * - 初始：只显示中文释义，所有字母为下划线
+     * - 每次答错后揭示1-3个新字母（随机选择未揭示的位置）
+     * - 全部揭示后：固定显示6秒用于记忆，然后自动关闭
+     */
+    function renderWordModalContent(modal, word, indices, options) {
+        const opts = options || {};
+        const isFullyRevealed = indices.size >= word.english.length;
+        const displayWord = getDisplayWord(word.english, indices);
+        const revealedCount = indices.size;
+
+        // 渐进提示文本
+        let hintSection = '';
+        if (revealedCount > 0 && !isFullyRevealed) {
+            hintSection = `<div style="text-align: center; margin: 10px 0; padding: 8px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
+                <small style="color: #e65100;">💡 提示: 已揭示 ${revealedCount}/${word.english.length} 个字母</small>
+            </div>`;
+        }
+
+        // 全部揭示后的记忆提示
+        let memorySection = '';
+        if (isFullyRevealed) {
+            memorySection = `<div style="text-align: center; margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 6px; border: 1px solid #a5d6a7;">
+                <div style="font-size: 18px; font-weight: bold; color: #2e7d32; letter-spacing: 4px; font-family: monospace;">${word.english}</div>
+                <small style="color: #388e3c;">📖 记住这个单词，6秒后自动关闭...</small>
+            </div>`;
+        }
+
         const body = modal.querySelector('.bilibili-study-modal-body');
         if (!body) return;
 
-        const displayWord = getDisplayWord(word.english, revealedCount);
-        const hintText = revealedCount > 0 ? `<small class="bilibili-study-hint-text">提示: ${displayWord}</small>` : '';
-
         body.innerHTML = `
-            <p style="font-size: 18px; margin-bottom: 20px; text-align: center;">
-                请输入以下单词的英文翻译：<br>
+            <p style="font-size: 18px; margin-bottom: 15px; text-align: center;">
+                请输入以下释义的英文单词：<br>
                 <strong style="font-size: 24px; color: #00a1d6;">${word.chinese}</strong>
             </p>
-            ${hintText}
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 22px; font-family: monospace; letter-spacing: 4px; color: #333;">
+                    ${displayWord}
+                </div>
+            </div>
+            ${hintSection}
+            ${memorySection}
             <input type="text" id="bilibili-study-word-input"
-                   placeholder="请输入英文单词"
+                   placeholder="${isFullyRevealed ? '记忆模式 - 请记住这个单词' : '请输入英文单词'}"
+                   ${isFullyRevealed ? 'disabled' : ''}
                    style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 15px; margin-top: 10px; box-sizing: border-box;">
-            <div id="bilibili-study-word-feedback" style="text-align: center; font-size: 16px; margin-bottom: 10px;"></div>
+            <div id="bilibili-study-word-feedback" style="text-align: center; font-size: 16px; margin-bottom: 10px; min-height: 24px;"></div>
             <div class="bilibili-study-action-buttons" style="justify-content: center;">
-                <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-word-submit">
+                <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-word-submit"
+                        ${isFullyRevealed ? 'style="opacity:0.5;cursor:not-allowed;"' : ''}>
                     提交
                 </button>
                 <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-word-skip">
@@ -2780,11 +2603,15 @@ const InterventionController = (function() {
         `;
     }
 
-    function getDisplayWord(word, revealedCount) {
+    /**
+     * 根据已揭示字母索引生成展示字符串
+     * 已揭示字母显示为绿色加粗，未揭示显示为下划线
+     */
+    function getDisplayWord(word, indices) {
         const letters = word.split('');
         let display = [];
         for (let i = 0; i < letters.length; i++) {
-            if (i < revealedCount) {
+            if (indices.has(i)) {
                 display.push(`<span style="color: #16a34a; font-weight: bold;">${letters[i]}</span>`);
             } else {
                 display.push('_');
@@ -2793,56 +2620,92 @@ const InterventionController = (function() {
         return display.join(' ');
     }
 
+    /**
+     * 渐进式单词提交处理
+     * - 正确：直接关闭弹窗
+     * - 错误：随机揭示1-3个新字母作为提示
+     * - 全部揭示：固定显示6秒用于记忆后自动关闭
+     */
     function handleWordSubmit() {
         const input = document.getElementById('bilibili-study-word-input');
         const feedback = document.getElementById('bilibili-study-word-feedback');
         if (!input || !feedback || !currentWord) return;
 
         const answer = input.value.trim();
-        const correct = WordVerifier.checkAnswer(currentWord, answer);
+        if (!answer) return; // 空输入不处理
 
+        const correct = WordVerifier.checkAnswer(currentWord, answer);
         WordVerifier.updateMastery(currentWord, correct);
         WordVerifier.recordAnswer(currentWord, correct);
         StatisticsTracker.recordWordAttempt(correct);
 
         if (correct) {
             feedback.innerHTML = '<span style="color: #16a34a; font-weight: bold;">✅ 回答正确！</span>';
-            // Close immediately - lastPopupTime already set when popup was shown
-            closeCurrentModal();
+            // 正确答案直接关闭
+            setTimeout(() => closeCurrentModal(), 300);
         } else {
-            feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误</span>';
-            revealedLetters++;
+            feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误，再试一次</span>';
 
-            if (revealedLetters >= currentWord.english.length) {
-                revealedLetters = currentWord.english.length;
-                feedback.innerHTML = `<span style="color: #dc2626;">正确答案: ${currentWord.english}</span>`;
+            // 随机揭示1-3个新字母
+            const totalLength = currentWord.english.length;
+            const unrevealedIndices = [];
+            for (let i = 0; i < totalLength; i++) {
+                if (!revealedIndices.has(i)) {
+                    unrevealedIndices.push(i);
+                }
+            }
 
-                const waitTime = 5000 + Math.random() * 1000;
+            // 随机选择1-3个（不超过剩余未揭示数）
+            const revealCount = Math.min(
+                Math.floor(Math.random() * 3) + 1,
+                unrevealedIndices.length
+            );
+
+            // Fisher-Yates 部分洗牌选取
+            for (let i = unrevealedIndices.length - 1; i > 0 && revealCount > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [unrevealedIndices[i], unrevealedIndices[j]] = [unrevealedIndices[j], unrevealedIndices[i]];
+            }
+            const toReveal = unrevealedIndices.slice(0, revealCount);
+            toReveal.forEach(idx => revealedIndices.add(idx));
+
+            // 检查是否全部揭示
+            if (revealedIndices.size >= totalLength) {
+                // 全部揭示 - 显示完整单词，6秒后自动关闭
+                const modal = document.getElementById('bilibili-study-word-modal');
+                if (modal) {
+                    renderWordModalContent(modal, currentWord, revealedIndices, { fullyRevealed: true });
+                }
+                wordRevealTime = Date.now();
                 setTimeout(() => {
                     if (modalState === MODAL_STATES.WORD_VERIFY) {
                         closeCurrentModal();
-                        // lastPopupTime already set when popup was shown
+                        // 重置lastPopupTime以开始下一轮计时
+                        lastPopupTime = Date.now();
                     }
-                }, waitTime);
+                }, 6000);
             } else {
+                // 部分揭示 - 重新渲染弹窗内容，保留已揭示的字母
                 const modal = document.getElementById('bilibili-study-word-modal');
                 if (modal) {
-                    renderWordModalContent(modal, currentWord, revealedLetters);
+                    renderWordModalContent(modal, currentWord, revealedIndices);
                     const newInput = document.getElementById('bilibili-study-word-input');
                     if (newInput) {
                         newInput.value = '';
                         newInput.focus();
                     }
+                    // 重新绑定事件（renderWordModalContent会替换innerHTML）
                     document.getElementById('bilibili-study-word-submit').addEventListener('click', handleWordSubmit);
                     document.getElementById('bilibili-study-word-skip').addEventListener('click', function() {
                         closeCurrentModal();
-                        // lastPopupTime already set when popup was shown
                     });
-                    newInput.addEventListener('keypress', function(e) {
-                        if (e.key === 'Enter') {
-                            handleWordSubmit();
-                        }
-                    });
+                    if (newInput) {
+                        newInput.addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter') {
+                                handleWordSubmit();
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -2861,11 +2724,8 @@ const InterventionController = (function() {
         const intervalMs = stageConfig.interval * 1000;
 
         if (now - lastPopupTime >= intervalMs) {
-            if (stage === 2) {
-                showStage2Modal();
-            } else if (stage >= 3) {
-                showWordVerifierModal();
-            }
+            // 所有分心阶段统一使用单词验证弹窗
+            showWordVerifierModal();
             // Update lastPopupTime AFTER showing popup
             lastPopupTime = now;
         }
@@ -2876,7 +2736,7 @@ const InterventionController = (function() {
         lastPopupTime = 0;
         modalState = MODAL_STATES.NONE;
         currentWord = null;
-        revealedLetters = 0;
+        revealedIndices = new Set();
         wordRevealTime = 0;
     }
 
