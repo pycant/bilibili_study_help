@@ -1,0 +1,36 @@
+# ================================
+# B站学习专注助手 - Git忽略规则
+# ================================
+
+# ---- AI 工具文件（含工作记忆、专家历史，不应公开） ----
+.workbuddy/
+
+# ---- Node.js / 包管理器 ----
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ---- 系统文件 ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- IDE / 编辑器 ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- 临时文件 ----
+*.log
+*.tmp
+*.bak
+
+# ---- 环境变量 / 密钥 ----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
