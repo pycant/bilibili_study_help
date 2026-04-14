@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.5
+// @version      1.0.7
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -2353,7 +2353,11 @@ const InterventionController = (function() {
     }
 
     function showConfirmModal() {
-        if (modalState !== MODAL_STATES.NONE) return;
+        if (modalState !== MODAL_STATES.NONE) {
+            console.log('[B站学习助手] showConfirmModal: 跳过，当前弹窗状态=', modalState);
+            return;
+        }
+        console.log('[B站学习助手] showConfirmModal: 显示确认弹窗');
         modalState = MODAL_STATES.CONFIRM;
 
         // 获取白名单课程
@@ -2500,14 +2504,19 @@ const InterventionController = (function() {
     }
 
     function showWordVerifierModal() {
-        if (modalState !== MODAL_STATES.NONE) return;
+        if (modalState !== MODAL_STATES.NONE) {
+            console.log('[B站学习助手] showWordVerifierModal: 跳过，当前弹窗状态=', modalState);
+            return;
+        }
 
         const word = WordVerifier.selectWord();
         if (!word) {
+            console.warn('[B站学习助手] showWordVerifierModal: 无可用词汇，跳过弹窗');
             modalState = MODAL_STATES.NONE;
             return;
         }
 
+        console.log('[B站学习助手] showWordVerifierModal: 显示弹窗，单词=', word.chinese, '/', word.english);
         modalState = MODAL_STATES.WORD_VERIFY;
         currentWord = word;
         revealedIndices = new Set();
@@ -2547,6 +2556,9 @@ const InterventionController = (function() {
      * - 初始：只显示中文释义，所有字母为下划线
      * - 每次答错后揭示1-3个新字母（随机选择未揭示的位置）
      * - 全部揭示后：固定显示6秒用于记忆，然后自动关闭
+     *
+     * 首次调用时 modal 为空 div，需要先创建完整外壳；
+     * 后续调用时只更新 .bilibili-study-modal-body 内容
      */
     function renderWordModalContent(modal, word, indices, options) {
         const opts = options || {};
@@ -2571,10 +2583,8 @@ const InterventionController = (function() {
             </div>`;
         }
 
-        const body = modal.querySelector('.bilibili-study-modal-body');
-        if (!body) return;
-
-        body.innerHTML = `
+        // 弹窗主体内容
+        const bodyContent = `
             <p style="font-size: 18px; margin-bottom: 15px; text-align: center;">
                 请输入以下释义的英文单词：<br>
                 <strong style="font-size: 24px; color: #00a1d6;">${word.chinese}</strong>
@@ -2601,6 +2611,26 @@ const InterventionController = (function() {
                 </button>
             </div>
         `;
+
+        let body = modal.querySelector('.bilibili-study-modal-body');
+        if (!body) {
+            // 首次渲染：modal 为空 div，需要创建完整的外壳结构
+            console.log('[B站学习助手] renderWordModalContent: 首次渲染，创建弹窗外壳');
+            modal.innerHTML = `
+                <div class="bilibili-study-modal" style="max-width: 450px;">
+                    <div class="bilibili-study-modal-header">
+                        <h2>📝 单词验证</h2>
+                    </div>
+                    <div class="bilibili-study-modal-body">
+                        ${bodyContent}
+                    </div>
+                </div>
+            `;
+        } else {
+            // 后续渲染：只更新 body 内容
+            console.log('[B站学习助手] renderWordModalContent: 更新弹窗内容, revealedCount=', indices.size);
+            body.innerHTML = bodyContent;
+        }
     }
 
     /**
@@ -2712,18 +2742,27 @@ const InterventionController = (function() {
     }
 
     function showPopupIfNeeded(stage) {
-        if (modalState !== MODAL_STATES.NONE) return;
+        if (modalState !== MODAL_STATES.NONE) {
+            console.log('[B站学习助手] showPopupIfNeeded: 跳过，弹窗已打开 state=', modalState);
+            return;
+        }
 
         const config = ConfigManager.get();
         const stages = config.interventionStages || [];
         const stageConfig = stages[stage];
 
-        if (!stageConfig || stageConfig.interval === 0) return;
+        if (!stageConfig || stageConfig.interval === 0) {
+            console.log('[B站学习助手] showPopupIfNeeded: 跳过，stage=', stage, 'config=', stageConfig);
+            return;
+        }
 
         const now = Date.now();
         const intervalMs = stageConfig.interval * 1000;
+        const elapsed = now - lastPopupTime;
 
-        if (now - lastPopupTime >= intervalMs) {
+        console.log('[B站学习助手] showPopupIfNeeded: stage=', stage, 'elapsed=', elapsed, 'interval=', intervalMs, 'ready=', elapsed >= intervalMs);
+
+        if (elapsed >= intervalMs) {
             // 所有分心阶段统一使用单词验证弹窗
             showWordVerifierModal();
             // Update lastPopupTime AFTER showing popup
@@ -2805,6 +2844,7 @@ const InterventionController = (function() {
             if (state.distractionStartTime === null) {
                 state.distractionStartTime = Date.now();
                 state.isStudying = false;
+                console.log('[B站学习助手] check: 首次分心，弹出确认弹窗');
                 showConfirmModal();
                 return;
             }
@@ -2818,6 +2858,7 @@ const InterventionController = (function() {
                 if (newStage >= 2) {
                     lastPopupTime = state.distractionStartTime + (newStage === 2 ? 300 : newStage === 3 ? 600 : 1200) * 1000;
                 }
+                console.log('[B站学习助手] check: 阶段变更 →', newStage, '分心时长=', distractionDuration + 's');
             }
 
             if (state.currentStage === 1) {
@@ -2957,14 +2998,29 @@ const InterventionController = (function() {
 
     // Set up SPA navigation handling
     PageMonitor.observeSPAChanges(function(newBV) {
-        // Reset intervention state on page change
-        if (window.__bilibiliStudyAppState) {
-            window.__bilibiliStudyAppState.currentStage = 0;
-            window.__bilibiliStudyAppState.distractionStartTime = null;
-            window.__bilibiliStudyAppState.isStudying = true;
+        const state = window.__bilibiliStudyAppState;
+        const isWhitelisted = ConfigManager.isWhitelisted(newBV);
+
+        if (isWhitelisted || !ConfigManager.isStudyTime()) {
+            // 切到白名单视频或非学习时段：重置干预状态
+            if (state) {
+                state.currentStage = 0;
+                state.distractionStartTime = null;
+                state.isStudying = true;
+            }
+            InterventionController.reset();
+            removeVisualIntervention();
+            console.log('[B站学习助手] SPA导航到白名单视频/非学习时段，重置干预状态');
+        } else {
+            // 切到另一个非白名单视频：保留干预状态，关闭已有弹窗
+            // 不重置 distractionStartTime 和 currentStage，让干预计时延续
+            InterventionController.closeCurrentModal();
+            console.log('[B站学习助手] SPA导航到非白名单视频，保留干预状态', {
+                currentStage: state?.currentStage,
+                distractionStartTime: state?.distractionStartTime,
+                elapsed: state?.distractionStartTime ? Math.floor((Date.now() - state.distractionStartTime) / 1000) + 's' : 'null'
+            });
         }
-        InterventionController.reset();
-        removeVisualIntervention();
 
         // Recreate floating window if needed
         if (PageMonitor.isVideoPage()) {

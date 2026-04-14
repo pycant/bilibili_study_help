@@ -2,7 +2,9 @@
 
 ## 版本记录
 
-- v1.0.5 (当前): 统一分心阶段弹窗为渐进式单词验证，重构弹窗逻辑
+- v1.0.7 (当前): 修复SPA导航导致干预状态重置，弹窗永远无法触发
+- v1.0.6: 修复单词验证弹窗不显示的回归Bug
+- v1.0.5: 统一分心阶段弹窗为渐进式单词验证，重构弹窗逻辑
 - v1.0.4: 修复弹窗全屏显示、暗色模式适配、课程选择无反应
 - v1.0.3: 完整暗色模式支持、单词填空练习、课程选择菜单
 - v1.0.2: 修复弹窗计时逻辑、单词验证延迟、页面可见性处理
@@ -369,6 +371,48 @@ toReveal.forEach(idx => revealedIndices.add(idx));
 - `getDisplayWord()` — 基于索引集合生成展示
 - `handleWordSubmit()` — 渐进式揭示+记忆模式逻辑
 - `showPopupIfNeeded()` — Stage 2/3/4 统一调用
+
+**修复状态**：✅ 已完成
+
+---
+
+### Bug #6: SPA导航导致干预状态重置，弹窗永远无法触发（v1.0.7）
+
+**现象**：用户在分心期间切换非白名单视频，学习提醒弹窗永远无法触发。
+
+**根因分析**：
+- B站是SPA应用，用户切换视频时触发 `history.pushState` → `onRouteChange` → `observeSPAChanges` 回调
+- 回调无条件执行 `InterventionController.reset()`，重置所有状态：`currentStage=0`、`distractionStartTime=null`、`lastPopupTime=0`
+- 下一秒 `check()` 重新设置 `distractionStartTime = Date.now()`，又弹出确认弹窗
+- 如此循环：每次切视频都从零开始，永远累积不到5分钟触发 Stage 2
+
+**修复方案**：
+```javascript
+// 修改前：无条件重置
+PageMonitor.observeSPAChanges(function(newBV) {
+    state.currentStage = 0;
+    state.distractionStartTime = null;
+    state.isStudying = true;
+    InterventionController.reset();
+    removeVisualIntervention();
+});
+
+// 修改后：区分白名单/非白名单视频
+PageMonitor.observeSPAChanges(function(newBV) {
+    const isWhitelisted = ConfigManager.isWhitelisted(newBV);
+    if (isWhitelisted || !ConfigManager.isStudyTime()) {
+        // 白名单视频/非学习时段 → 重置干预状态
+        InterventionController.reset();
+        removeVisualIntervention();
+    } else {
+        // 非白名单视频 → 保留干预状态，只关闭当前弹窗
+        InterventionController.closeCurrentModal();
+    }
+});
+```
+
+**代码位置**：
+- `observeSPAChanges` 回调 — SPA路由变化处理（脚本底部初始化区）
 
 **修复状态**：✅ 已完成
 

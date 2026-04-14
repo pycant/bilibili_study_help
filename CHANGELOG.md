@@ -1,5 +1,30 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.0.7] - 2026-04-14
+
+### Bug修复 🐛
+
+#### SPA导航导致干预状态重置，弹窗永远无法触发
+- **根因**：用户在分心期间切换非白名单视频（SPA路由变化），`observeSPAChanges` 回调无条件重置所有干预状态（`currentStage=0`、`distractionStartTime=null`、`lastPopupTime=0`），导致干预计时从零开始，永远累积不到5分钟触发 Stage 2 弹窗
+- **修复**：SPA导航时区分白名单/非白名单视频
+  - 切到白名单视频或非学习时段 → 重置干预状态（正常行为）
+  - 切到非白名单视频 → 保留干预状态，只关闭当前弹窗，让干预计时延续
+- 新增关键路径调试日志
+
+## [1.0.6] - 2026-04-14
+
+### Bug修复 🐛
+
+#### 单词验证弹窗不显示（v1.0.5引入的回归）
+- **根因**：`renderWordModalContent()` 在首次调用时查找 `.bilibili-study-modal-body`，但此时 modal 是空 div，不存在该子元素，导致 `if (!body) return` 直接返回，弹窗为空
+- **修复**：区分首次渲染与后续渲染，首次时创建完整弹窗外壳（含 header + body），后续只更新 body 内容
+
+### 调试增强 🔧
+- 在 `showConfirmModal`、`showWordVerifierModal`、`showPopupIfNeeded`、`renderWordModalContent` 关键路径添加 `console.log` 调试输出
+- 方便在浏览器控制台快速定位弹窗不显示的原因
+
+---
+
 ## [1.0.5] - 2026-04-13
 
 ### 功能改进 ✨

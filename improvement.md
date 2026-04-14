@@ -1,6 +1,6 @@
 # B站学习专注提醒助手 功能改进文档
 
-> 当前版本：v1.0.5 | 更新日期：2026-04-13
+> 当前版本：v1.0.6 | 更新日期：2026-04-14
 
 ---
 
@@ -139,6 +139,38 @@
 - `InterventionController.getDisplayWord()` — 基于索引集合生成展示字符串
 - `InterventionController.handleWordSubmit()` — 渐进式揭示+记忆模式逻辑
 - `InterventionController.showPopupIfNeeded()` — Stage 2/3/4 统一调用
+
+### 1.11 ✅ 修复单词验证弹窗不显示的回归Bug（v1.0.6）
+
+**问题描述**：v1.0.5 统一弹窗为单词验证后，学习提醒弹窗完全不显示。
+
+**根因分析**：
+
+### 1.12 ✅ 修复SPA导航导致干预状态重置（v1.0.7）
+
+**问题描述**：用户在分心期间切换视频（SPA路由变化），学习提醒弹窗永远无法触发。
+
+**根因分析**：
+- `observeSPAChanges` 回调在每次路由变化时无条件执行 `InterventionController.reset()`，重置所有干预状态
+- 切到另一个非白名单视频时，`distractionStartTime` 被设为 null
+- 下一秒 `check()` 重新开始计时，又弹出确认弹窗，但永远累积不到5分钟
+
+**修复方案**：
+- SPA导航时区分白名单/非白名单视频
+- 白名单视频 → 重置干预状态（用户已回到学习）
+- 非白名单视频 → 保留干预状态，只关闭当前弹窗，干预计时延续
+- `showWordVerifierModal()` 创建空 `div` 后调用 `renderWordModalContent(modal, word, revealedIndices)`
+- `renderWordModalContent()` 查找 `.bilibili-study-modal-body`，但首次调用时 modal 是空 div，不存在该子元素
+- `if (!body) return` 直接返回，弹窗被挂载到 DOM 但内容为空，用户看不到任何东西
+
+**修复方案**：
+- 区分首次渲染与后续渲染
+- 首次渲染时：创建完整弹窗外壳（含 header + body），然后填充内容
+- 后续渲染时（答错后更新）：只替换 `.bilibili-study-modal-body` 的 innerHTML
+
+**调试增强**：
+- 在 `showConfirmModal`、`showWordVerifierModal`、`showPopupIfNeeded`、`renderWordModalContent` 添加 `console.log` 调试输出
+- 打开浏览器 F12 控制台可快速定位弹窗流程卡在哪一步
 
 ---
 
