@@ -2241,7 +2241,8 @@ const DetailPanel = (function() {
         close,
         isOpen: function() { return isOpen; },
         getCurrentTheme: function() { return currentTheme; },
-        detectTheme: detectBilibiliTheme
+        detectTheme: detectBilibiliTheme,
+        loadTheme: loadTheme
     };
 })();
 
@@ -2612,21 +2613,30 @@ const InterventionController = (function() {
      */
     function applyCurrentThemeToModal(el) {
         if (!el) return;
-        // 实时检测B站主题（不依赖缓存值，确保随B站主题切换即时生效）
-        const saved = localStorage.getItem('bilibiliStudyAssistant_theme');
-        const detected = DetailPanel.detectTheme ? DetailPanel.detectTheme() : 'light';
-        const theme = saved || detected;
-        console.log('[B站学习助手] applyCurrentThemeToModal: theme=', theme, 'el=', el.id, '(saved=' + (saved || 'null') + ', detected=' + detected + ')');
-        console.log('[B站学习助手]   DetailPanel.getCurrentTheme可用:', typeof DetailPanel.getCurrentTheme === 'function');
+        // 优先使用 DetailPanel 中已初始化的主题（脚本启动时已通过 initTheme 加载）
+        const theme = (typeof DetailPanel !== 'undefined' && typeof DetailPanel.getCurrentTheme === 'function')
+            ? DetailPanel.getCurrentTheme()
+            : (localStorage.getItem('bilibiliStudyAssistant_theme') || 'light');
+        console.log('[B站学习助手] applyCurrentThemeToModal: theme=', theme, 'el=', el.id);
         console.log('[B站学习助手]   当前classList:', el.className);
+
+        const innerModal = el.querySelector('.bilibili-study-modal');
+
         if (theme === 'dark') {
             el.classList.add('bilibili-study-dark-mode');
-            // 修复内联样式覆盖问题：弹窗外层背景需要强制暗色
             el.style.background = 'rgba(0, 0, 0, 0.85)';
-            console.log('[B站学习助手]   已添加dark-mode并设置暗色背景');
+            if (innerModal) {
+                innerModal.style.background = 'rgba(30, 35, 45, 0.97)';
+                innerModal.style.color = '#e0e0e0';
+            }
+            console.log('[B站学习助手]   已应用深色模式 (overlay+modal)');
         } else {
             el.classList.remove('bilibili-study-dark-mode');
             el.style.background = 'rgba(0, 0, 0, 0.5)';
+            if (innerModal) {
+                innerModal.style.background = '';
+                innerModal.style.color = '';
+            }
         }
         console.log('[B站学习助手]   最终classList:', el.className);
     }
@@ -3427,6 +3437,9 @@ const InterventionController = (function() {
     // Initialize config
     ConfigManager.load();
     console.log('B站学习专注提醒助手 loaded, config:', ConfigManager.get());
+
+    // Initialize theme (preload so intervention modals can use it immediately)
+    DetailPanel.loadTheme();
 
     // Initialize data modules
     const userConfig = getOrInitModule('userConfig');
