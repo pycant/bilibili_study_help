@@ -1756,14 +1756,22 @@ const DetailPanel = (function() {
 
         return `
             <div class="bilibili-study-modal-module" id="bilibili-study-module3-wrapper">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px;">
                     <h3 class="bilibili-study-module-title" style="margin-bottom: 0;">📚 单词学习</h3>
-                    <button id="bilibili-study-reset-vocab"
-                            class="bilibili-study-btn bilibili-study-btn-secondary"
-                            style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px;"
-                            title="重置所有单词的掌握状态和答题记录，从零开始学习">
-                        🔄 刷新词库
-                    </button>
+                    <div style="display: flex; gap: 6px;">
+                        <button id="bilibili-study-refresh-vocab"
+                                class="bilibili-study-btn"
+                                style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa;"
+                                title="刷新词库信息，查看最新学习状态（不清除记录）">
+                            🔄 刷新词库
+                        </button>
+                        <button id="bilibili-study-reset-vocab"
+                                class="bilibili-study-btn bilibili-study-btn-secondary"
+                                style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px;"
+                                title="重置所有单词的掌握状态和答题记录，从零开始学习">
+                            🗑️ 重置记录
+                        </button>
+                    </div>
                 </div>
                 <div class="bilibili-study-module-content">
                     ${vocabWarning}
@@ -2036,7 +2044,17 @@ const DetailPanel = (function() {
                 });
             }
 
-            // Reset vocab button
+            // 刷新词库按钮：重新渲染模块，显示最新词库统计信息
+            const refreshVocabBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (refreshVocabBtn) {
+                function handleRefreshVocab(e) {
+                    e.stopPropagation();
+                    WordVerifier.refreshVocabDisplay();
+                }
+                refreshVocabBtn.addEventListener('click', handleRefreshVocab);
+            }
+
+            // 重置记录按钮：清空所有学习记录，需用户确认
             const resetVocabBtn = document.getElementById('bilibili-study-reset-vocab');
             if (resetVocabBtn) {
                 function handleResetVocab(e) {
@@ -2053,10 +2071,10 @@ const DetailPanel = (function() {
                         const newModule = temp.firstElementChild;
                         wrapper.replaceWith(newModule);
                         // 为新渲染的按钮重新绑定事件
-                        const newBtn = document.getElementById('bilibili-study-reset-vocab');
-                        if (newBtn) {
-                            newBtn.addEventListener('click', handleResetVocab);
-                        }
+                        const newResetBtn = document.getElementById('bilibili-study-reset-vocab');
+                        if (newResetBtn) newResetBtn.addEventListener('click', handleResetVocab);
+                        const newRefreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+                        if (newRefreshBtn) newRefreshBtn.addEventListener('click', handleRefreshVocab);
                     }
                     // 同步刷新 Module4 建议区（掌握数量已变）
                     const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
@@ -2330,6 +2348,32 @@ const WordVerifier = (function() {
         console.log('[B站学习助手] resetWordRecords: 词库学习状态已重置');
     }
 
+    // 刷新词库显示：重新计算词库信息并动态重渲染 Module3 + Module4（不清除记录）
+    function refreshVocabDisplay() {
+        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
+        if (wrapper) {
+            const temp = document.createElement('div');
+            temp.innerHTML = renderModule3();
+            wrapper.replaceWith(temp.firstElementChild);
+            // 为新按钮重新绑定事件
+            const resetBtn = document.getElementById('bilibili-study-reset-vocab');
+            if (resetBtn) resetBtn.addEventListener('click', handleResetVocab);
+            const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocab);
+        }
+        // 同步刷新 Module4 建议区
+        const modalElement = document.getElementById('bilibili-study-detail-modal');
+        if (modalElement) {
+            const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
+            if (module4) {
+                const temp4 = document.createElement('div');
+                temp4.innerHTML = renderModule4();
+                module4.replaceWith(temp4.firstElementChild);
+            }
+        }
+        console.log('[B站学习助手] refreshVocabDisplay: 词库信息已刷新');
+    }
+
     return {
         selectWord,
         checkAnswer,
@@ -2339,7 +2383,8 @@ const WordVerifier = (function() {
         getRecentAnswers,
         getUnmasteredCount,
         getReducedProbabilityCount,
-        resetWordRecords
+        resetWordRecords,
+        refreshVocabDisplay
     };
 })();
 

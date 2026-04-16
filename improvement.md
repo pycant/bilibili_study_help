@@ -219,28 +219,38 @@
 
 ---
 
-### 1.14 ✅ 单词学习模块新增「刷新词库」按钮（v1.0.8 补丁）
+### 1.14 ✅ 单词学习模块新增刷新词库+重置记录双按钮（v1.0.8 补丁）
 
-**需求描述**：在详细统计 → 单词学习区域添加刷新词库按钮，点击后更新词库信息和单词学习状态。
+**需求描述**：在详细统计 → 单词学习区域添加两个独立功能按钮，区分刷新词库与重置记录。
 
 **实现方案**：
 
 #### UI改动
-- `📚 单词学习` h3 标题行改为 flex 布局，右侧添加 `🔄 刷新词库` 按钮（`bilibili-study-btn-secondary` 样式）
+- `📚 单词学习` h3 标题行改为 flex 布局，右侧并排两个按钮（gap: 6px）
+  - `🔄 刷新词库`：蓝色文字按钮（背景`rgba(59,130,246,0.15)`），无确认框
+  - `🗑️ 重置记录`：`bilibili-study-btn-secondary` 灰色样式，有确认框
 - 整个模块容器增加 `id="bilibili-study-module3-wrapper"` 用于动态替换
 
 #### 业务逻辑
-- `WordVerifier.resetWordRecords()`：新增函数，将 `wordRecords.words` 和 `wordRecords.recentAnswers` 清空后存储
-- 点击按钮弹出原生 `confirm` 确认框，防止误操作
+
+**刷新词库（`WordVerifier.refreshVocabDisplay()`）**：
+- 作用：重新读取词库信息，刷新 Module3 + Module4 的显示
+- **不修改任何学习记录**，只更新 UI
+- 点击后直接刷新，无需确认
+
+**重置记录（`WordVerifier.resetWordRecords()`）**：
+- 作用：清空所有已掌握单词、连续正确次数、答题历史
+- 点击后弹出 `confirm` 确认框，防止误操作
 - 确认后执行重置，**无需关闭面板**：
   - 用 `renderModule3()` 重新渲染替换 `#bilibili-study-module3-wrapper` DOM 节点
   - 同步刷新 Module4（学习建议区，因掌握数量变化）
-  - 为新渲染的按钮重新注册 click 事件（命名函数 `handleResetVocab`）
+  - 为新渲染的按钮重新注册 click 事件（命名函数 `handleResetVocab` / `handleRefreshVocab`）
 
 #### 代码位置
-- `renderModule3()` — 添加按钮HTML结构（第~1758行）
-- `WordVerifier.resetWordRecords()` — 新增函数（第~2280行）
-- `StatisticsModal.open()` setTimeout 事件绑定区 — 注册 `handleResetVocab`（第~2018行）
+- `renderModule3()` — 双按钮 HTML 结构（第~1758行）
+- `WordVerifier.refreshVocabDisplay()` — 新增函数，导出供外部调用
+- `WordVerifier.resetWordRecords()` — 新增函数，清空 words/recentAnswers
+- `StatisticsModal.open()` setTimeout 事件绑定区 — 注册 `handleRefreshVocab` 和 `handleResetVocab`
 
 ---
 
