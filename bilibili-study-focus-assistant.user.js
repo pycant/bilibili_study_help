@@ -1534,11 +1534,31 @@ const DetailPanel = (function() {
     function loadTheme() {
         try {
             const saved = localStorage.getItem(THEME_KEY);
-            currentTheme = saved || 'light';
+            if (saved) {
+                currentTheme = saved;
+            } else {
+                // 无手动偏好时自动检测B站当前主题
+                currentTheme = detectBilibiliTheme();
+            }
         } catch (e) {
-            currentTheme = 'light';
+            currentTheme = detectBilibiliTheme();
         }
+        console.log('[B站学习助手] loadTheme: currentTheme=', currentTheme,
+            '(saved=' + (localStorage.getItem(THEME_KEY) || 'null') + ')');
         return currentTheme;
+    }
+
+    // 自动检测B站当前主题
+    function detectBilibiliTheme() {
+        // B站暗色模式: <html data-theme="dark">
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            return 'dark';
+        }
+        // 备选: 检测系统主题偏好
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'light';
     }
 
     // Save theme preference
@@ -2220,7 +2240,8 @@ const DetailPanel = (function() {
         open,
         close,
         isOpen: function() { return isOpen; },
-        getCurrentTheme: function() { return currentTheme; }
+        getCurrentTheme: function() { return currentTheme; },
+        detectTheme: detectBilibiliTheme
     };
 })();
 
@@ -2591,8 +2612,11 @@ const InterventionController = (function() {
      */
     function applyCurrentThemeToModal(el) {
         if (!el) return;
-        const theme = DetailPanel.getCurrentTheme ? DetailPanel.getCurrentTheme() : 'light';
-        console.log('[B站学习助手] applyCurrentThemeToModal: theme=', theme, 'el=', el.id);
+        // 实时检测B站主题（不依赖缓存值，确保随B站主题切换即时生效）
+        const saved = localStorage.getItem('bilibiliStudyAssistant_theme');
+        const detected = DetailPanel.detectTheme ? DetailPanel.detectTheme() : 'light';
+        const theme = saved || detected;
+        console.log('[B站学习助手] applyCurrentThemeToModal: theme=', theme, 'el=', el.id, '(saved=' + (saved || 'null') + ', detected=' + detected + ')');
         console.log('[B站学习助手]   DetailPanel.getCurrentTheme可用:', typeof DetailPanel.getCurrentTheme === 'function');
         console.log('[B站学习助手]   当前classList:', el.className);
         if (theme === 'dark') {
