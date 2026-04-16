@@ -1625,6 +1625,43 @@ const DetailPanel = (function() {
         return days.slice(0, 7);
     }
 
+    // ===== 刷新/重置词库按钮处理器（声明在作用域顶层，showDetailedStatsModal和refreshVocabDisplay均可访问） =====
+    function handleRefreshVocabBtn(e) {
+        e.stopPropagation();
+        console.log('[B站学习助手] handleRefreshVocabBtn: 刷新词库显示');
+        refreshVocabDisplay();
+    }
+
+    function handleResetVocabBtn(e) {
+        e.stopPropagation();
+        if (!confirm('确认重置所有单词的掌握状态和答题记录吗？\n\n所有已掌握单词、连续正确次数将清零，重新从零开始学习。')) {
+            return;
+        }
+        console.log('[B站学习助手] handleResetVocabBtn: 重置所有学习记录');
+        WordVerifier.resetWordRecords();
+        // 重渲染 Module3 + Module4
+        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
+        if (wrapper) {
+            const temp = document.createElement('div');
+            temp.innerHTML = renderModule3();
+            wrapper.replaceWith(temp.firstElementChild);
+            // 重新绑定按钮事件
+            const newResetBtn = document.getElementById('bilibili-study-reset-vocab');
+            if (newResetBtn) newResetBtn.addEventListener('click', handleResetVocabBtn);
+            const newRefreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (newRefreshBtn) newRefreshBtn.addEventListener('click', handleRefreshVocabBtn);
+        }
+        const modal = document.getElementById('bilibili-study-detail-modal');
+        if (modal) {
+            const m4 = modal.querySelector('.bilibili-study-modal-module:nth-child(4)');
+            if (m4) {
+                const t = document.createElement('div');
+                t.innerHTML = renderModule4();
+                m4.replaceWith(t.firstElementChild);
+            }
+        }
+    }
+
     // Render Module 1: Today's overview
     function renderModule1() {
         const stats = getTodayStats();
@@ -2047,44 +2084,13 @@ const DetailPanel = (function() {
             // 刷新词库按钮：重新渲染模块，显示最新词库统计信息
             const refreshVocabBtn = document.getElementById('bilibili-study-refresh-vocab');
             if (refreshVocabBtn) {
-                function handleRefreshVocab(e) {
-                    e.stopPropagation();
-                    WordVerifier.refreshVocabDisplay();
-                }
-                refreshVocabBtn.addEventListener('click', handleRefreshVocab);
+                refreshVocabBtn.addEventListener('click', handleRefreshVocabBtn);
             }
 
             // 重置记录按钮：清空所有学习记录，需用户确认
             const resetVocabBtn = document.getElementById('bilibili-study-reset-vocab');
             if (resetVocabBtn) {
-                function handleResetVocab(e) {
-                    e.stopPropagation();
-                    if (!confirm('确认重置所有单词的掌握状态和答题记录吗？\n\n所有已掌握单词、连续正确次数将清零，重新从零开始学习。')) {
-                        return;
-                    }
-                    WordVerifier.resetWordRecords();
-                    // 动态重渲染 Module3（无需关闭面板）
-                    const wrapper = document.getElementById('bilibili-study-module3-wrapper');
-                    if (wrapper) {
-                        const temp = document.createElement('div');
-                        temp.innerHTML = renderModule3();
-                        const newModule = temp.firstElementChild;
-                        wrapper.replaceWith(newModule);
-                        // 为新渲染的按钮重新绑定事件
-                        const newResetBtn = document.getElementById('bilibili-study-reset-vocab');
-                        if (newResetBtn) newResetBtn.addEventListener('click', handleResetVocab);
-                        const newRefreshBtn = document.getElementById('bilibili-study-refresh-vocab');
-                        if (newRefreshBtn) newRefreshBtn.addEventListener('click', handleRefreshVocab);
-                    }
-                    // 同步刷新 Module4 建议区（掌握数量已变）
-                    const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
-                    if (module4) {
-                        const temp4 = document.createElement('div');
-                        temp4.innerHTML = renderModule4();
-                        module4.replaceWith(temp4.firstElementChild);
-                    }
-                }
-                resetVocabBtn.addEventListener('click', handleResetVocab);
+                resetVocabBtn.addEventListener('click', handleResetVocabBtn);
             }
         }, 100);
     }
@@ -2355,11 +2361,11 @@ const WordVerifier = (function() {
             const temp = document.createElement('div');
             temp.innerHTML = renderModule3();
             wrapper.replaceWith(temp.firstElementChild);
-            // 为新按钮重新绑定事件
+            // 为新按钮重新绑定事件（handleRefreshVocabBtn/handleResetVocabBtn已提取到模块作用域）
             const resetBtn = document.getElementById('bilibili-study-reset-vocab');
-            if (resetBtn) resetBtn.addEventListener('click', handleResetVocab);
+            if (resetBtn) resetBtn.addEventListener('click', handleResetVocabBtn);
             const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
-            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocab);
+            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocabBtn);
         }
         // 同步刷新 Module4 建议区
         const modalElement = document.getElementById('bilibili-study-detail-modal');
