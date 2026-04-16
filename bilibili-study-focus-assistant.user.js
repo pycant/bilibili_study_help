@@ -1645,6 +1645,9 @@ const DetailPanel = (function() {
         }
         console.log('[B站学习助手] handleResetVocabBtn: 重置所有学习记录');
         WordVerifier.resetWordRecords();
+        // 弹出主题感知的重置成功提示
+        const total = WordVerifier.parseVocabulary().length;
+        showVocabToast({ total, mastered: 0, learnable: total, changed: 0 }, 'reset');
         // 重渲染 Module3 + Module4
         const wrapper = document.getElementById('bilibili-study-module3-wrapper');
         if (wrapper) {
@@ -1701,6 +1704,12 @@ const DetailPanel = (function() {
             }
         }
         console.log('[B站学习助手] refreshVocabDisplay: 词库信息刷新完成');
+
+        // 弹出主题感知的词库信息提示
+        const total = WordVerifier.parseVocabulary().length;
+        const mastered = Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length;
+        const learnable = total - mastered;
+        showVocabToast({ total, mastered, learnable, changed: learnable }, 'refresh');
     }
 
     // Render Module 1: Today's overview
@@ -2596,6 +2605,110 @@ const InterventionController = (function() {
             el.style.background = 'rgba(0, 0, 0, 0.5)';
         }
         console.log('[B站学习助手]   最终classList:', el.className);
+    }
+
+    /**
+     * 主题感知的词库变更提示 Toast
+     * @param {object} stats - { total, mastered, learnable, changed }
+     * @param {string} type - 'refresh' | 'reset'
+     */
+    function showVocabToast(stats, type) {
+        // 移除已有 toast
+        const existing = document.getElementById('bilibili-study-vocab-toast');
+        if (existing) existing.remove();
+
+        const theme = getCurrentTheme ? getCurrentTheme() : 'light';
+        const isDark = theme === 'dark';
+
+        const toast = document.createElement('div');
+        toast.id = 'bilibili-study-vocab-toast';
+
+        // 主题配色
+        const bg = isDark ? 'rgba(30, 35, 45, 0.97)' : 'rgba(255, 255, 255, 0.97)';
+        const border = isDark ? 'rgba(96, 165, 250, 0.4)' : 'rgba(59, 130, 246, 0.3)';
+        const iconColor = isDark ? '#60a5fa' : '#3b82f6';
+        const titleColor = isDark ? '#f1f5f9' : '#1e293b';
+        const statColor = isDark ? '#94a3b8' : '#64748b';
+        const valueColor = isDark ? '#60a5fa' : '#3b82f6';
+        const changedColor = isDark ? '#4ade80' : '#16a34a';
+
+        const icon = type === 'reset'
+            ? '<span style="font-size:16px">🗑️</span>'
+            : '<span style="font-size:16px">🔄</span>';
+        const title = type === 'reset' ? '学习记录已重置' : '词库信息已刷新';
+        const changedText = type === 'reset'
+            ? ''
+            : `<span style="color:${changedColor}; font-weight:600; margin-left:8px;">+${stats.changed} 可学习</span>`;
+
+        toast.innerHTML = `
+            <div style="
+                display: flex; align-items: center; gap: 8px;
+                background: ${bg};
+                border: 1px solid ${border};
+                border-radius: 10px;
+                padding: 10px 14px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                backdrop-filter: blur(12px);
+                color: ${titleColor};
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                min-width: 220px;
+                animation: vocabToastIn 0.25s ease-out;
+            ">
+                ${icon}
+                <span style="font-weight: 600; font-size: 13px;">${title}</span>
+            </div>
+            <div style="
+                display: flex; gap: 12px; margin-top: 4px;
+                background: ${bg};
+                padding: 0 14px 10px 38px;
+                font-size: 12px;
+            ">
+                <span style="color: ${statColor}">总词 <span style="color: ${valueColor}; font-weight:600">${stats.total}</span></span>
+                <span style="color: ${statColor}">已掌握 <span style="color: ${valueColor}; font-weight:600">${stats.mastered}</span></span>
+                <span style="color: ${statColor}">可学习 <span style="color: ${valueColor}; font-weight:600">${stats.learnable}</span>${changedText}</span>
+            </div>
+        `;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        `;
+
+        // 注入动画样式（仅首次）
+        if (!document.getElementById('bilibili-study-toast-styles')) {
+            const style = document.createElement('style');
+            style.id = 'bilibili-study-toast-styles';
+            style.textContent = `
+                @keyframes vocabToastIn {
+                    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+                }
+                @keyframes vocabToastOut {
+                    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    to   { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // 插入到 modal overlay 内部（跟随 modal 位置）
+        const overlay = document.querySelector('.bilibili-study-modal-overlay');
+        if (overlay) {
+            overlay.insertBefore(toast, overlay.firstChild);
+        } else {
+            document.body.appendChild(toast);
+        }
+
+        // 自动消失
+        setTimeout(() => {
+            toast.style.animation = 'vocabToastOut 0.25s ease-in forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+
+        console.log('[B站学习助手] showVocabToast: type=', type, stats);
     }
 
     /**
