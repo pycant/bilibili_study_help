@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.7
+// @version      1.0.8
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -572,6 +572,66 @@ const STYLES = `
     .bilibili-study-dark-mode .course-item:hover {
         background: #333 !important;
     }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning {
+        background: #3d2800 !important;
+        border-color: #6d4c00 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning-title {
+        color: #ffb74d !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning-text {
+        color: #ff9800 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical {
+        background: #3d0000 !important;
+        border-color: #6d0000 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical-title {
+        color: #ef5350 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical-text {
+        color: #f44336 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-hint {
+        background: #2a1f00 !important;
+        border-color: #5d4200 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-hint small {
+        color: #ffb74d !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-memory {
+        background: #1a2e1a !important;
+        border-color: #2d5a2d !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-memory-word {
+        color: #4ade80 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-memory small {
+        color: #66bb6a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-chinese {
+        color: #00d4e6 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-display {
+        color: #e0e0e0 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-word-revealed {
+        color: #4ade80 !important;
+    }
 `;
 
 // Inject CSS
@@ -591,8 +651,8 @@ const USER_CONFIG = {
     // Study time periods: [["HH:MM", "HH:MM"], ...]
     studyPeriods: [
         ["08:00", "12:00"],
-        ["14:00", "18:00"],
-        ["19:00", "22:00"]
+        ["13:30", "17:30"],
+        ["19:00", "22:30"]
     ],
 
     // Whitelist: { "BV号": { name: "课程名称", addedAt: timestamp }, ... }
@@ -611,22 +671,116 @@ const USER_CONFIG = {
     interventionStages: [
         { threshold: 0, interval: 0 },      // Stage 0: Confirm
         { threshold: 60, interval: 0 },     // Stage 1: 1min, visual only
-        { threshold: 300, interval: 120 },  // Stage 2: 5min, popup 2min
+        { threshold: 180, interval: 60 },  // Stage 2: 3min, popup 1min
         { threshold: 600, interval: 30 },   // Stage 3: 10min, popup 30s
         { threshold: 1200, interval: 15 }   // Stage 4: 20min, popup 15s
     ],
 
     // Vocabulary: ["Chinese:English", ...]
+    // 包含六级+考研英语一核心词汇（约220词）
+    // 注意：中文释义不重复，避免wordData键冲突
     vocabulary: [
-        "学习:study",
-        "专注:focus",
-        "进步:progress",
-        "努力:effort",
-        "坚持:persistence"
+        // ===== 基础词汇（保留）=====
+        "学习:study", "专注:focus", "进步:progress", "努力:effort", "坚持:persistence",
+        // ===== 六级核心词汇 =====
+        "抛弃(彻底放弃):abandon", "能力(先天才能):ability", "缺席:absence", "绝对的:absolute",
+        "吸收(液体/知识):absorb", "抽象的:abstract", "丰富的(大量存在):abundant", "滥用:abuse",
+        "学术的:academic", "加速:accelerate", "接受(主动收下):accept", "进入(通道/权利):access",
+        "意外(偶然事故):accident", "赞扬:acclaim", "提供住宿:accommodate", "完成(达成目标):accomplish",
+        "符合(一致):accord", "从而(因此):accordingly", "账户:account", "积累(逐渐增加):accumulate",
+        "准确的:accurate", "指责(控告):accuse", "实现(达成):achieve", "承认(公开确认):acknowledge",
+        "获得(习得技能):acquire", "适应(调整适应):adapt", "充足的(够用的):adequate", "调整:adjust",
+        "管理(执行):administer", "钦佩:admire", "坦白(承认事实):admit", "采用(采纳方案):adopt",
+        "前行(推进):advance", "有利的:advantageous", "冒险:adventure", "提倡(主张):advocate",
+        "影响(作用于):affect", "负担得起:afford", "证实(断言):affirm", "加剧(恶化):aggravate",
+        "侵略:aggress", "痛苦(极度):agony", "同意:agree", "警报:alarm",
+        "使惊恐:alert", "分配(拨给):allocate", "允许:allow", "改变(微调):alter",
+        "替代选择:alternative", "模糊的(歧义):ambiguous", "雄心:ambition", "修正(改正):amend",
+        "充裕的(丰富的):ample", "娱乐(逗乐):amuse", "分析:analyze", "祖先:ancestor",
+        "周年:anniversary", "宣布(公开):announce", "每年的:annual", "预期(期望):anticipate",
+        "焦虑:anxiety", "道歉:apologize", "明显的(表面可见):apparent", "呼吁(恳求):appeal",
+        "食欲:appetite", "申请(正式请求):apply", "指定(任命):appoint", "评价(估价):appraise",
+        "欣赏(感激):appreciate", "方法(接近方式):approach", "适当的:appropriate", "批准:approve",
+        "大致(近似):approximately", "武断的:arbitrary", "争论(辩论):argue", "出现(产生):arise",
+        "安排:arrange", "逮捕:arrest", "到达:arrive", "人造的:artificial",
+        "评估(估定价值):assess", "布置(分配任务):assign", "协助:assist", "联合(联想):associate",
+        "假设(未经证实):assume", "保证(向人保证):assure", "依恋(附上):attach", "达到(实现):attain",
+        "尝试(企图):attempt", "出席(参加):attend", "态度:attitude", "吸引:attract",
+        "归因(属性):attribute", "拍卖:auction", "权威:authority", "自动的:automatic",
+        "可用的:available", "平均:average", "避免:avoid", "奖赏(授予):award",
+        "意识到:aware", "尴尬的:awkward",
+        // ===== 考研英语一高频词汇 =====
+        "行为(举止):behavior", "有益的:beneficial", "受益(获利):benefit", "债券:bond",
+        "边界:boundary", "简短的(简洁):brief", "预算:budget", "负担(重荷):burden",
+        "官僚:bureaucracy", "运动(社会活动):campaign", "能力(潜力):capability",
+        "事业(职业生涯):career", "灾难(大祸):catastrophe", "类别:category", "谨慎的:cautious",
+        "挑战:challenge", "特征(特点):characteristic", "环境(处境):circumstance", "文明的:civilized",
+        "澄清:clarify", "分类:classify", "客户:client", "气候:climate",
+        "碰撞(冲突):collide", "结合(融合):combine", "商业的:commercial", "承诺(许诺):commitment",
+        "交流(沟通):communicate", "社区:community", "对比(比较差异):compare", "竞争(比赛):compete",
+        "抱怨:complain", "复杂的(难解):complex", "构成(组成):compose", "理解(领悟):comprehend",
+        "强迫(迫使):compel", "补偿(赔偿):compensate", "竞争性:competitive", "补充(补足):complement",
+        "实施(执行):implement", "强加(征收):impose", "印象:impression", "改善(改进):improve",
+        "事件(小事):incident", "表明(指出):indicate", "个人的(个别的):individual", "勤奋(产业):industry",
+        "影响力(感化):influence", "通知(告知):inform", "固有的(内在):inherent", "最初的(开始):initial",
+        "发起(启动):initiate", "创新(革新):innovation", "调查(审查):investigate", "投资(投入):invest",
+        "涉及(包含):involve", "隔离(孤立):isolate", "判断:judge", "劳动:labor",
+        "发射(发起):launch", "合法的:legitimate", "自由(解放):liberty", "限制(限度):limit",
+        "维持(保养):maintain", "主要的(重大):major", "经营(管理):manage", "方式(态度):manner",
+        "制造(生产):manufacture", "边缘(利润):margin", "成熟的(深思熟虑):mature", "衡量(测量):measure",
+        "机制(机理):mechanism", "方法(系统性):method", "迁移(移居):migrate", "最低的:minimum",
+        "部长:minister", "少数(少数民族):minority", "模式(模特):model", "监控(监测):monitor",
+        "道德:morality", "动机(驱动力):motive", "谈判(协商):negotiate", "中立的:neutral",
+        "提名(任命):nominate", "显著的(明显):noticeable", "获取(得到):obtain", "占领(职业):occupation",
+        "发生(出现):occur", "官方的:official", "反对(对抗):oppose", "选项:option",
+        "结果(成效):outcome", "克服:overcome", "监督(监管):oversee", "参与(加入):participate",
+        "规律(模式):pattern", "察觉(感知):perceive", "执行(表演):perform", "永久的:permanent",
+        "许可证:permit", "执着(坚持不懈):persistent", "视角(观点):perspective", "现象:phenomenon",
+        "哲学:philosophy", "身体的(物理):physical", "策划(规划):plan", "政策:policy",
+        "污染:pollute", "流行的(受欢迎):popular", "人口:population", "实践(练习):practice",
+        "先前的(时间):previous", "首要的(主要):primary", "原则(法则):principle", "优先(优先权):priority",
+        "程序(流程):procedure", "过程(进程):process", "产物(结果):product", "利润(利益):profit",
+        "前进(进展):progress", "工程(项目):project", "促进(晋升):promote", "比例(份额):proportion",
+        "提议(建议):propose", "前景(展望):prospect", "保护:protect", "抗议(反对):protest",
+        "供应(提供):provide", "追求(追赶):pursue", "资格:qualification", "质量(品质):quality",
+        "数量:quantity", "引用(报价):quote", "比率(速率):rate", "理性的:reason",
+        "意识到(实现):realize", "推荐(建议):recommend", "恢复(痊愈):recover",
+        "减少(降低):reduce", "改革(改良):reform", "拒绝(驳回):reject", "相关的(切题):relevant",
+        "缓解(减轻):relieve", "勉强(不情愿):reluctant", "依赖(信赖):rely", "移除:remove",
+        "替换(取代):replace", "代表(象征):represent", "繁殖(复制):reproduce", "声誉(名望):reputation",
+        "需求(要求):require", "研究(调查):research", "抵抗(抗拒):resist", "解决(决心):resolve",
+        "资源:resource", "响应(反应):respond", "修复(恢复):restore", "约束(限制):restrict",
+        "导致(起因):result", "退休:retire", "揭示(揭露):reveal", "收入(税收):revenue",
+        "变革(革命):revolution", "风险:risk", "角色:role", "牺牲:sacrifice",
+        "安全(无危险):safety", "规模(比例尺):scale", "日程(安排):schedule", "奖学金:scholarship",
+        "范围(余地):scope", "部分(章节):section", "保障(获得):secure", "寻求(探索):seek", "挑选(精选):select",
+        "敏感的(灵敏):sensitive", "分离(分开):separate", "顺序(次序):sequence", "转变(切换):shift",
+        "短缺(不足):shortage", "重大的(有意义):significant", "类似的(相似):similar", "简化:simplify",
+        "处境(形势):situation", "技能:skill", "社会的(社交):social", "解答(解决):solve",
+        "出处(源头):source", "特定的(明确):specific", "稳定(稳固):stabilize", "标准:standard",
+        "地位(状态):status", "策略(战略):strategy", "实力(优势):strength", "强调(压力):stress",
+        "严格的:strict", "构造(结构):structure", "提交(服从):submit", "物质(本质):substance",
+        "代替(替补):substitute", "成功(继承):succeed", "充分的(足够):sufficient", "提议(暗示):suggest",
+        "上级(优越):superior", "增补(补充):supplement", "供给:supply", "支持(支撑):support",
+        "猜想(假设):suppose", "外观(表面):surface", "手术(操作):surgery", "民意调查:survey",
+        "存活(幸存):survive", "嫌疑(怀疑):suspect", "象征: symbolize", "同情(共鸣):sympathy",
+        "趋势(倾向):tendency", "理论:theory", "治疗(疗法):therapy", "因此(所以):therefore",
+        "威胁:threat", "容忍(宽恕):tolerate", "传统:tradition", "变革(转化):transform",
+        "过渡(转变):transition", "传播(传送):transmit", "透明的:transparent", "走向(趋势):trend",
+        "触发(引发):trigger", "典型的:typical", "最终的(极限):ultimate", "承担(保证):undertake",
+        "统一的(一致):uniform", "独特的(唯一):unique", "普遍的(全球):universal", "更新: update",
+        "城市的:urban", "紧急的(迫切):urgent", "利用(运用):utilize", "有效的(合法):valid",
+        "有价值的:valuable", "差异(变动):variation", "多样的(不同):various", "交通工具:vehicle",
+        "版本:version", "暴力的(猛烈):violent", "虚拟的(实质上):virtual", "可见的:visible",
+        "远见(愿景):vision", "至关重要的: vital", "词汇:vocabulary", "音量(卷):volume",
+        "自愿的:voluntary", "福利:welfare", "智慧:wisdom", "见证(证据):witness"
     ],
 
     // Consecutive correct answers to master a word
-    masteryThreshold: 3,
+    // 连续正确5次降低出现概率，8次移入已掌握词库
+    masteryThreshold: 8,
+    // 连续正确次数达到此值时降低出现概率
+    reducedProbabilityThreshold: 5,
 
     // Include mastered words in verification
     includeMasteredWords: false,
@@ -945,6 +1099,7 @@ const DEFAULT_DATA_STRUCTURES = {
         },
         vocabulary: USER_CONFIG.vocabulary,
         masteryThreshold: USER_CONFIG.masteryThreshold,
+        reducedProbabilityThreshold: USER_CONFIG.reducedProbabilityThreshold,
         includeMasteredWords: USER_CONFIG.includeMasteredWords,
         floatingWindow: USER_CONFIG.floatingWindow,
         statsPeriod: USER_CONFIG.statsPeriod
@@ -1559,6 +1714,34 @@ const DetailPanel = (function() {
         const masteredWords = Object.values(words).filter(w => w.mastered).length;
         const progressPercent = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
 
+        // 词库更新提醒：非掌握单词不足50时显示
+        const unmasteredCount = WordVerifier.getUnmasteredCount();
+        const reducedCount = WordVerifier.getReducedProbabilityCount();
+        let vocabWarning = '';
+        if (unmasteredCount < 50 && unmasteredCount > 0) {
+            vocabWarning = `
+                <div class="bilibili-study-vocab-warning" style="margin: 10px 0; padding: 10px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 16px;">⚠️</span>
+                        <span class="bilibili-study-vocab-warning-title" style="color: #e65100; font-weight: bold;">词库不足提醒</span>
+                    </div>
+                    <p class="bilibili-study-vocab-warning-text" style="margin: 5px 0 0 0; color: #bf360c; font-size: 13px;">
+                        可学习单词仅剩 <strong>${unmasteredCount}</strong> 个，建议添加更多词汇以保持学习效果。
+                    </p>
+                </div>`;
+        } else if (unmasteredCount === 0) {
+            vocabWarning = `
+                <div class="bilibili-study-vocab-critical" style="margin: 10px 0; padding: 10px; background: #ffebee; border-radius: 6px; border: 1px solid #ffcdd2;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 16px;">🔴</span>
+                        <span class="bilibili-study-vocab-critical-title" style="color: #c62828; font-weight: bold;">词库已全部掌握</span>
+                    </div>
+                    <p class="bilibili-study-vocab-critical-text" style="margin: 5px 0 0 0; color: #b71c1c; font-size: 13px;">
+                        所有单词已掌握，请添加新词汇继续学习！
+                    </p>
+                </div>`;
+        }
+
         // Get mastered words list
         const masteredList = Object.values(words)
             .filter(w => w.mastered)
@@ -1575,6 +1758,7 @@ const DetailPanel = (function() {
             <div class="bilibili-study-modal-module">
                 <h3 class="bilibili-study-module-title">📚 单词学习</h3>
                 <div class="bilibili-study-module-content">
+                    ${vocabWarning}
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">总单词数：</span>
                         <span class="bilibili-study-stat-value">${totalWords}</span>
@@ -1582,6 +1766,10 @@ const DetailPanel = (function() {
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">已掌握：</span>
                         <span class="bilibili-study-stat-value">${masteredWords}</span>
+                    </div>
+                    <div class="bilibili-study-stat-row">
+                        <span class="bilibili-study-stat-label">可学习：</span>
+                        <span class="bilibili-study-stat-value">${unmasteredCount}${reducedCount > 0 ? `（含${reducedCount}个即将掌握）` : ''}</span>
                     </div>
                     <div class="bilibili-study-progress-container">
                         <div class="bilibili-study-progress-bar">
@@ -1944,6 +2132,7 @@ const WordVerifier = (function() {
     }
 
     // Select a random word for verification
+    // 连续正确5次降低出现概率(权重0.2)，连续正确8次移入已掌握
     function selectWord() {
         const words = parseVocabulary();
         if (words.length === 0) {
@@ -1953,23 +2142,63 @@ const WordVerifier = (function() {
         const config = ConfigManager.get();
         const records = getWordRecords();
         const wordData = records.words || {};
+        const reducedThreshold = config.reducedProbabilityThreshold || 5;
 
-        // Filter words based on mastery setting
-        let availableWords = words;
-        if (!config.includeMasteredWords) {
-            availableWords = words.filter(w => {
-                const data = wordData[w.chinese];
-                return !data || !data.mastered;
-            });
-        }
+        // 过滤已掌握单词（连续正确8次）
+        let availableWords = words.filter(w => {
+            const data = wordData[w.chinese];
+            return !data || !data.mastered;
+        });
 
-        // If all words are mastered, use all words
+        // 如果全部掌握，使用所有单词
         if (availableWords.length === 0) {
             availableWords = words;
         }
 
-        const randomIndex = Math.floor(Math.random() * availableWords.length);
-        return availableWords[randomIndex];
+        // 加权随机选择：连续正确5-7次的单词权重降为0.2
+        const weights = availableWords.map(w => {
+            const data = wordData[w.chinese];
+            if (data && data.consecutiveCorrect >= reducedThreshold && !data.mastered) {
+                return 0.2; // 降低出现概率
+            }
+            return 1.0;
+        });
+
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+        for (let i = 0; i < availableWords.length; i++) {
+            random -= weights[i];
+            if (random <= 0) {
+                return availableWords[i];
+            }
+        }
+        return availableWords[availableWords.length - 1];
+    }
+
+    // 获取非掌握单词数量（用于词库更新提醒）
+    function getUnmasteredCount() {
+        const words = parseVocabulary();
+        if (words.length === 0) return 0;
+        const records = getWordRecords();
+        const wordData = records.words || {};
+        return words.filter(w => {
+            const data = wordData[w.chinese];
+            return !data || !data.mastered;
+        }).length;
+    }
+
+    // 获取处于"降概率"阶段的单词数量
+    function getReducedProbabilityCount() {
+        const words = parseVocabulary();
+        if (words.length === 0) return 0;
+        const config = ConfigManager.get();
+        const records = getWordRecords();
+        const wordData = records.words || {};
+        const reducedThreshold = config.reducedProbabilityThreshold || 5;
+        return words.filter(w => {
+            const data = wordData[w.chinese];
+            return data && data.consecutiveCorrect >= reducedThreshold && !data.mastered;
+        }).length;
     }
 
     // Check if user's answer is correct
@@ -1981,7 +2210,8 @@ const WordVerifier = (function() {
     }
 
     // Update word mastery status
-    function updateMastery(word, correct) {
+    // wasHinted: 提示后正确不算连续正确
+    function updateMastery(word, correct, wasHinted) {
         const records = getWordRecords();
         const wordData = records.words || {};
         const config = ConfigManager.get();
@@ -2001,15 +2231,18 @@ const WordVerifier = (function() {
         entry.totalAttempts++;
 
         if (correct) {
-            entry.consecutiveCorrect++;
             entry.correctAttempts++;
-            // Check if word is mastered
+            // 提示后正确不算连续正确，不增加consecutiveCorrect
+            if (!wasHinted) {
+                entry.consecutiveCorrect++;
+            }
+            // 检查是否达到掌握阈值
             if (entry.consecutiveCorrect >= config.masteryThreshold) {
                 entry.mastered = true;
             }
         } else {
             entry.consecutiveCorrect = 0;
-            entry.mastered = false;
+            // 答错不清除mastered状态，只有连续正确重新累积
         }
 
         records.words = wordData;
@@ -2056,7 +2289,9 @@ const WordVerifier = (function() {
         updateMastery,
         getMasteredWords,
         recordAnswer,
-        getRecentAnswers
+        getRecentAnswers,
+        getUnmasteredCount,
+        getReducedProbabilityCount
     };
 })();
 
@@ -2569,7 +2804,7 @@ const InterventionController = (function() {
         // 渐进提示文本
         let hintSection = '';
         if (revealedCount > 0 && !isFullyRevealed) {
-            hintSection = `<div style="text-align: center; margin: 10px 0; padding: 8px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
+            hintSection = `<div class="bilibili-study-word-hint" style="text-align: center; margin: 10px 0; padding: 8px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
                 <small style="color: #e65100;">💡 提示: 已揭示 ${revealedCount}/${word.english.length} 个字母</small>
             </div>`;
         }
@@ -2577,8 +2812,8 @@ const InterventionController = (function() {
         // 全部揭示后的记忆提示
         let memorySection = '';
         if (isFullyRevealed) {
-            memorySection = `<div style="text-align: center; margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 6px; border: 1px solid #a5d6a7;">
-                <div style="font-size: 18px; font-weight: bold; color: #2e7d32; letter-spacing: 4px; font-family: monospace;">${word.english}</div>
+            memorySection = `<div class="bilibili-study-word-memory" style="text-align: center; margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 6px; border: 1px solid #a5d6a7;">
+                <div class="bilibili-study-word-memory-word" style="font-size: 18px; font-weight: bold; color: #2e7d32; letter-spacing: 4px; font-family: monospace;">${word.english}</div>
                 <small style="color: #388e3c;">📖 记住这个单词，6秒后自动关闭...</small>
             </div>`;
         }
@@ -2587,10 +2822,10 @@ const InterventionController = (function() {
         const bodyContent = `
             <p style="font-size: 18px; margin-bottom: 15px; text-align: center;">
                 请输入以下释义的英文单词：<br>
-                <strong style="font-size: 24px; color: #00a1d6;">${word.chinese}</strong>
+                <strong class="bilibili-study-word-chinese" style="font-size: 24px; color: #00a1d6;">${word.chinese}</strong>
             </p>
             <div style="text-align: center; margin-bottom: 15px;">
-                <div style="font-size: 22px; font-family: monospace; letter-spacing: 4px; color: #333;">
+                <div class="bilibili-study-word-display" style="font-size: 22px; font-family: monospace; letter-spacing: 4px; color: #333;">
                     ${displayWord}
                 </div>
             </div>
@@ -2642,7 +2877,7 @@ const InterventionController = (function() {
         let display = [];
         for (let i = 0; i < letters.length; i++) {
             if (indices.has(i)) {
-                display.push(`<span style="color: #16a34a; font-weight: bold;">${letters[i]}</span>`);
+                display.push(`<span class="bilibili-study-word-revealed" style="color: #16a34a; font-weight: bold;">${letters[i]}</span>`);
             } else {
                 display.push('_');
             }
@@ -2665,7 +2900,9 @@ const InterventionController = (function() {
         if (!answer) return; // 空输入不处理
 
         const correct = WordVerifier.checkAnswer(currentWord, answer);
-        WordVerifier.updateMastery(currentWord, correct);
+        // 如果有提示字母被揭示，标记为wasHinted
+        const wasHinted = revealedIndices.size > 0;
+        WordVerifier.updateMastery(currentWord, correct, wasHinted);
         WordVerifier.recordAnswer(currentWord, correct);
         StatisticsTracker.recordWordAttempt(correct);
 
