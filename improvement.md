@@ -219,7 +219,32 @@
 
 ---
 
-## 二、待修复/待改进项
+### 1.14 ✅ 单词学习模块新增「刷新词库」按钮（v1.0.8 补丁）
+
+**需求描述**：在详细统计 → 单词学习区域添加刷新词库按钮，点击后更新词库信息和单词学习状态。
+
+**实现方案**：
+
+#### UI改动
+- `📚 单词学习` h3 标题行改为 flex 布局，右侧添加 `🔄 刷新词库` 按钮（`bilibili-study-btn-secondary` 样式）
+- 整个模块容器增加 `id="bilibili-study-module3-wrapper"` 用于动态替换
+
+#### 业务逻辑
+- `WordVerifier.resetWordRecords()`：新增函数，将 `wordRecords.words` 和 `wordRecords.recentAnswers` 清空后存储
+- 点击按钮弹出原生 `confirm` 确认框，防止误操作
+- 确认后执行重置，**无需关闭面板**：
+  - 用 `renderModule3()` 重新渲染替换 `#bilibili-study-module3-wrapper` DOM 节点
+  - 同步刷新 Module4（学习建议区，因掌握数量变化）
+  - 为新渲染的按钮重新注册 click 事件（命名函数 `handleResetVocab`）
+
+#### 代码位置
+- `renderModule3()` — 添加按钮HTML结构（第~1758行）
+- `WordVerifier.resetWordRecords()` — 新增函数（第~2280行）
+- `StatisticsModal.open()` setTimeout 事件绑定区 — 注册 `handleResetVocab`（第~2018行）
+
+---
+
+
 
 | 优先级 | 内容 | 复杂度 | 状态 |
 |--------|------|--------|------|
