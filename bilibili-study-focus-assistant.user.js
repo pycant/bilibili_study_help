@@ -3211,6 +3211,11 @@ const InterventionController = (function() {
         }
 
         const correct = WordVerifier.checkAnswer(currentWord, answer);
+        console.log('[B站学习助手]   correct=', correct, 'target=', currentWord.english, 'answer=', answer);
+
+        const isDark = DetailPanel.getCurrentTheme() === 'dark';
+        console.log('[B站学习助手]   isDark=', isDark);
+
         // 如果有提示字母被揭示，标记为wasHinted
         const wasHinted = revealedIndices.size > 0;
         WordVerifier.updateMastery(currentWord, correct, wasHinted);
@@ -3218,10 +3223,12 @@ const InterventionController = (function() {
         StatisticsTracker.recordWordAttempt(correct);
 
         if (correct) {
+            console.log('[B站学习助手]   → 回答正确! 弹窗即将关闭');
             feedback.innerHTML = `<span style="color: ${isDark ? '#4ade80' : '#16a34a'}; font-weight: bold;">✅ 回答正确！</span>`;
             // 正确答案直接关闭
             setTimeout(() => closeCurrentModal(), 300);
         } else {
+            console.log('[B站学习助手]   → 回答错误, 开始揭示字母, wordLength=', currentWord.english.length, 'revealed=', revealedIndices.size);
             feedback.innerHTML = `<span style="color: ${isDark ? '#f87171' : '#dc2626'}; font-weight: bold;">❌ 回答错误，再试一次</span>`;
 
             // 随机揭示1-3个新字母
