@@ -2964,7 +2964,11 @@ const InterventionController = (function() {
             }
         }
 
-        document.getElementById('bilibili-study-confirm-yes').addEventListener('click', function() {
+        const yesBtn = document.getElementById('bilibili-study-confirm-yes');
+        console.log('[B站学习助手] showConfirmModal: 绑定确认按钮事件 yesBtn=', !!yesBtn);
+        yesBtn.addEventListener('click', function(e) {
+            console.log('[B站学习助手] 确认离开按钮被点击');
+            e.stopPropagation();
             closeCurrentModal();
             StatisticsTracker.incrementDistractionCount();
             if (window.__bilibiliStudyAppState) {
