@@ -3256,13 +3256,18 @@ const InterventionController = (function() {
 
             // 检查是否全部揭示
             if (revealedIndices.size >= totalLength) {
+                console.log('[B站学习助手]   → 全部字母已揭示! 进入记忆模式(6秒)');
                 // 全部揭示 - 显示完整单词，6秒后自动关闭
                 const modal = document.getElementById('bilibili-study-word-modal');
+                console.log('[B站学习助手]   modal=', !!modal);
                 if (modal) {
+                    console.log('[B站学习助手]   调用renderWordModalContent(fullyRevealed=true)');
                     renderWordModalContent(modal, currentWord, revealedIndices, { fullyRevealed: true });
+                    console.log('[B站学习助手]   记忆模式渲染完成');
                 }
                 wordRevealTime = Date.now();
                 setTimeout(() => {
+                    console.log('[B站学习助手]   记忆模式6秒到! 关闭弹窗, modalState=', modalState, 'WORD_VERIFY=', MODAL_STATES.WORD_VERIFY);
                     if (modalState === MODAL_STATES.WORD_VERIFY) {
                         closeCurrentModal();
                         // 重置lastPopupTime以开始下一轮计时
