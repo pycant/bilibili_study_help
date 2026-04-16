@@ -656,7 +656,7 @@ const USER_CONFIG = {
     studyPeriods: [
         ["08:00", "12:00"],
         ["13:30", "17:30"],
-        ["19:00", "22:30"]
+        ["19:00", "23:00"]
     ],
 
     // Whitelist: { "BV号": { name: "课程名称", addedAt: timestamp }, ... }
@@ -3491,12 +3491,23 @@ const InterventionController = (function() {
     console.log('B站学习专注提醒助手 loaded, config:', ConfigManager.get());
 
     // Initialize theme (preload so intervention modals can use it immediately)
-    DetailPanel.loadTheme();
+    try {
+        DetailPanel.loadTheme();
+        console.log('[B站学习助手] init: loadTheme 完成');
+    } catch(e) {
+        console.error('[B站学习助手] init: loadTheme 失败!', e);
+    }
 
     // Initialize data modules
-    const userConfig = getOrInitModule('userConfig');
-    const timeStats = getOrInitModule('timeStats');
-    const wordRecords = getOrInitModule('wordRecords');
+    let userConfig, timeStats, wordRecords;
+    try {
+        userConfig = getOrInitModule('userConfig');
+        timeStats = getOrInitModule('timeStats');
+        wordRecords = getOrInitModule('wordRecords');
+        console.log('[B站学习助手] init: Storage modules 初始化完成');
+    } catch(e) {
+        console.error('[B站学习助手] init: Storage modules 初始化失败!', e);
+    }
 
     console.log('Storage modules initialized:', {
         userConfig: !!userConfig,
@@ -3506,21 +3517,37 @@ const InterventionController = (function() {
     });
 
     // Initialize page monitor
-    PageMonitor.init();
+    try {
+        PageMonitor.init();
+        console.log('[B站学习助手] init: PageMonitor.init 完成');
+    } catch(e) {
+        console.error('[B站学习助手] init: PageMonitor.init 失败!', e);
+    }
 
     // Initialize statistics tracker
-    StatisticsTracker.init();
+    try {
+        StatisticsTracker.init();
+        console.log('[B站学习助手] init: StatisticsTracker.init 完成');
+    } catch(e) {
+        console.error('[B站学习助手] init: StatisticsTracker.init 失败!', e);
+    }
 
     // Create floating window if on video page
-    if (PageMonitor.isVideoPage()) {
-        FloatingWindow.create();
-        // Set up callback to open detail panel when floating window is clicked
-        FloatingWindow.setOnPanelOpen(function() {
-            DetailPanel.open();
-        });
+    try {
+        if (PageMonitor.isVideoPage()) {
+            FloatingWindow.create();
+            // Set up callback to open detail panel when floating window is clicked
+            FloatingWindow.setOnPanelOpen(function() {
+                DetailPanel.open();
+            });
+            console.log('[B站学习助手] init: FloatingWindow 创建完成');
+        }
+    } catch(e) {
+        console.error('[B站学习助手] init: FloatingWindow 创建失败!', e);
     }
 
     // Main timer loop - runs every second
+    console.log('[B站学习助手] init: 启动主定时器(1秒)');
     setInterval(function() {
         const state = window.__bilibiliStudyAppState;
         if (!state) return;
