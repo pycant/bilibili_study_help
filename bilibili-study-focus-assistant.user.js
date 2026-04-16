@@ -3047,18 +3047,38 @@ const InterventionController = (function() {
         applyCurrentThemeToModal(modal);
 
         const input = document.getElementById('bilibili-study-word-input');
+        const submitBtn = document.getElementById('bilibili-study-word-submit');
+        const skipBtn = document.getElementById('bilibili-study-word-skip');
+        console.log('[B站学习助手] showWordVerifierModal: DOM元素检查 input=', !!input, 'submit=', !!submitBtn, 'skip=', !!skipBtn);
+        
         if (input) input.focus();
 
-        document.getElementById('bilibili-study-word-submit').addEventListener('click', handleWordSubmit);
-        document.getElementById('bilibili-study-word-skip').addEventListener('click', function() {
-            closeCurrentModal();
-        });
-
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function() {
+                console.log('[B站学习助手] word-submit: 按钮被点击, currentWord=', currentWord ? currentWord.chinese : 'null');
                 handleWordSubmit();
-            }
-        });
+            });
+        } else {
+            console.error('[B站学习助手] showWordVerifierModal: 提交按钮未找到!');
+        }
+
+        if (skipBtn) {
+            skipBtn.addEventListener('click', function() {
+                console.log('[B站学习助手] word-skip: 跳过按钮被点击');
+                closeCurrentModal();
+            });
+        }
+
+        if (input) {
+            input.addEventListener('keypress', function(e) {
+                console.log('[B站学习助手] word-input keypress: key=', e.key);
+                if (e.key === 'Enter') {
+                    handleWordSubmit();
+                }
+            });
+        } else {
+            console.error('[B站学习助手] showWordVerifierModal: 输入框未找到!');
+        }
 
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
@@ -3174,12 +3194,21 @@ const InterventionController = (function() {
      * - 全部揭示：固定显示6秒用于记忆后自动关闭
      */
     function handleWordSubmit() {
+        console.log('[B站学习助手] handleWordSubmit: 开始处理');
         const input = document.getElementById('bilibili-study-word-input');
         const feedback = document.getElementById('bilibili-study-word-feedback');
-        if (!input || !feedback || !currentWord) return;
+        console.log('[B站学习助手]   input=', !!input, 'feedback=', !!feedback, 'currentWord=', currentWord ? currentWord.chinese : 'null');
+        if (!input || !feedback || !currentWord) {
+            console.error('[B站学习助手] handleWordSubmit: 提前退出! input=', !!input, 'feedback=', !!feedback, 'word=', !!currentWord);
+            return;
+        }
 
         const answer = input.value.trim();
-        if (!answer) return; // 空输入不处理
+        console.log('[B站学习助手]   answer=', JSON.stringify(answer), 'length=', answer.length);
+        if (!answer) {
+            console.log('[B站学习助手]   空输入，跳过');
+            return; // 空输入不处理
+        }
 
         const correct = WordVerifier.checkAnswer(currentWord, answer);
         // 如果有提示字母被揭示，标记为wasHinted
