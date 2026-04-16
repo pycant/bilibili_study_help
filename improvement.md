@@ -1,6 +1,6 @@
 # B站学习专注提醒助手 功能改进文档
 
-> 当前版本：v1.0.8 | 更新日期：2026-04-16
+> 当前版本：v1.0.9 | 更新日期：2026-04-16
 
 ---
 
@@ -248,9 +248,42 @@
 
 #### 代码位置
 - `renderModule3()` — 双按钮 HTML 结构（第~1758行）
-- `WordVerifier.refreshVocabDisplay()` — 新增函数，导出供外部调用
+- `DetailPanel.refreshVocabDisplay()` — 移入 DetailPanel 内部，消除跨作用域调用
+- `DetailPanel.handleRefreshVocabBtn()` / `handleResetVocabBtn()` — 模块作用域顶层声明
 - `WordVerifier.resetWordRecords()` — 新增函数，清空 words/recentAnswers
-- `StatisticsModal.open()` setTimeout 事件绑定区 — 注册 `handleRefreshVocab` 和 `handleResetVocab`
+- `ConfigManager.load()` — `vocabulary: USER_CONFIG.vocabulary` 始终用代码最新值
+- `applyCurrentThemeToModal()` — 深色内联背景同步 + 调试日志
+
+---
+
+### 1.15 ✅ v1.0.9 Bug 批量修复（v1.0.8 回归）
+
+**5个 Bug 的根因与修复对照表**：
+
+| Bug | 现象 | 根因 | 修复 |
+|-----|------|------|------|
+| Bug 1&4 | "总单词数：5"/"词库已全部掌握"误报 | `totalWords` 来自 localStorage 答题记录而非词库配置 | 改用 `WordVerifier.parseVocabulary().length` |
+| Bug 2 | 刷新词库无反应（控制台有日志但页面不变） | `refreshVocabDisplay()` 在 WordVerifier 里调 DetailPanel 私有函数，ReferenceError 被静默吞掉 | 将 `refreshVocabDisplay()` 移入 DetailPanel 内部 |
+| Bug 3&5 | 重置后"可学习：5"而非357；词库更新后仍只5词 | `ConfigManager.load()` 的 `...parsed` 让 localStorage 旧词库覆盖新词库 | `vocabulary: USER_CONFIG.vocabulary` 始终优先 |
+| 深色模式不生效 | 干预弹窗全屏时不显示暗色 | 内联 `rgba(0,0,0,0.5)` 背景覆盖 CSS 类；深色模式下内联背景未同步 | CSS 加 `!important`；JS 强制设置内联背景 + 调试日志 |
+
+**刷新词库按钮调试日志**（打开 F12 控制台可见）：
+```
+[B站学习助手] handleRefreshVocabBtn: 刷新词库显示
+[B站学习助手] refreshVocabDisplay: 开始刷新词库显示
+[B站学习助手]   当前词库总词数: 362
+[B站学习助手]   当前已掌握词数: 5
+[B站学习助手]   当前可学习词数: 357
+[B站学习助手]   已添加dark-mode并设置暗色背景
+[B站学习助手] refreshVocabDisplay: 词库信息刷新完成
+```
+
+**干预弹窗深色模式调试日志**：
+```
+[B站学习助手] applyCurrentThemeToModal: theme= dark  el= bilibili-study-word-modal
+[B站学习助手]   DetailPanel.getCurrentTheme可用: true
+[B站学习助手]   已添加dark-mode并设置暗色背景
+```
 
 ---
 

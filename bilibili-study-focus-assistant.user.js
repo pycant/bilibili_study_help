@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.8
+// @version      1.0.9
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -446,7 +446,11 @@ const STYLES = `
     .bilibili-study-dark-mode {
         background-color: rgba(0, 0, 0, 0.85) !important;
     }
-    
+
+    .bilibili-study-dark-mode .bilibili-study-modal-overlay {
+        background: rgba(0, 0, 0, 0.85) !important;
+    }
+
     .bilibili-study-dark-mode .bilibili-study-modal {
         background: #1e1e1e !important;
         color: #e0e0e0 !important;
@@ -813,6 +817,8 @@ const ConfigManager = (function() {
                 currentConfig = {
                     ...USER_CONFIG,
                     ...parsed,
+                    // 词库始终用代码中的最新值，防止 localStorage 旧词库（5词）覆盖新词库（362词）
+                    vocabulary: USER_CONFIG.vocabulary,
                     floatingWindow: {
                         ...USER_CONFIG.floatingWindow,
                         ...(parsed.floatingWindow || {})
@@ -1662,6 +1668,41 @@ const DetailPanel = (function() {
         }
     }
 
+    // 刷新词库显示（置于 DetailPanel 作用域内，可直接调用 renderModule3/renderModule4）
+    function refreshVocabDisplay() {
+        console.log('[B站学习助手] refreshVocabDisplay: 开始刷新词库显示');
+        console.log('[B站学习助手]   当前词库总词数:', WordVerifier.parseVocabulary().length);
+        console.log('[B站学习助手]   当前已掌握词数:', Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length);
+        console.log('[B站学习助手]   当前可学习词数:', WordVerifier.getUnmasteredCount());
+
+        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
+        if (wrapper) {
+            const temp = document.createElement('div');
+            temp.innerHTML = renderModule3();
+            wrapper.replaceWith(temp.firstElementChild);
+            // 为新按钮重新绑定事件（handleRefreshVocabBtn/handleResetVocabBtn同在DetailPanel作用域）
+            const resetBtn = document.getElementById('bilibili-study-reset-vocab');
+            if (resetBtn) resetBtn.addEventListener('click', handleResetVocabBtn);
+            const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocabBtn);
+            console.log('[B站学习助手] refreshVocabDisplay: Module3 刷新成功');
+        } else {
+            console.warn('[B站学习助手] refreshVocabDisplay: 未找到 Module3 容器元素');
+        }
+        // 同步刷新 Module4 建议区
+        const modalElement = document.getElementById('bilibili-study-detail-modal');
+        if (modalElement) {
+            const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
+            if (module4) {
+                const temp4 = document.createElement('div');
+                temp4.innerHTML = renderModule4();
+                module4.replaceWith(temp4.firstElementChild);
+                console.log('[B站学习助手] refreshVocabDisplay: Module4 刷新成功');
+            }
+        }
+        console.log('[B站学习助手] refreshVocabDisplay: 词库信息刷新完成');
+    }
+
     // Render Module 1: Today's overview
     function renderModule1() {
         const stats = getTodayStats();
@@ -1747,8 +1788,10 @@ const DetailPanel = (function() {
         const words = wordData.words || {};
         const recentAnswers = wordData.recentAnswers || [];
 
-        const totalWords = Object.keys(words).length;
-        const masteredWords = Object.values(words).filter(w => w.mastered).length;
+        // 统计来源：词库配置总词数，而非 localStorage 答题记录数
+        const vocabList = WordVerifier.parseVocabulary();
+        const totalWords = vocabList.length;  // 词库配置中的总词数（362）
+        const masteredWords = Object.values(words).filter(w => w.mastered).length;  // 答过且已掌握
         const progressPercent = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
 
         // 词库更新提醒：非掌握单词不足50时显示
@@ -2354,43 +2397,17 @@ const WordVerifier = (function() {
         console.log('[B站学习助手] resetWordRecords: 词库学习状态已重置');
     }
 
-    // 刷新词库显示：重新计算词库信息并动态重渲染 Module3 + Module4（不清除记录）
-    function refreshVocabDisplay() {
-        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
-        if (wrapper) {
-            const temp = document.createElement('div');
-            temp.innerHTML = renderModule3();
-            wrapper.replaceWith(temp.firstElementChild);
-            // 为新按钮重新绑定事件（handleRefreshVocabBtn/handleResetVocabBtn已提取到模块作用域）
-            const resetBtn = document.getElementById('bilibili-study-reset-vocab');
-            if (resetBtn) resetBtn.addEventListener('click', handleResetVocabBtn);
-            const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
-            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocabBtn);
-        }
-        // 同步刷新 Module4 建议区
-        const modalElement = document.getElementById('bilibili-study-detail-modal');
-        if (modalElement) {
-            const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
-            if (module4) {
-                const temp4 = document.createElement('div');
-                temp4.innerHTML = renderModule4();
-                module4.replaceWith(temp4.firstElementChild);
-            }
-        }
-        console.log('[B站学习助手] refreshVocabDisplay: 词库信息已刷新');
-    }
-
     return {
         selectWord,
         checkAnswer,
         updateMastery,
         getMasteredWords,
+        parseVocabulary,
         recordAnswer,
         getRecentAnswers,
         getUnmasteredCount,
         getReducedProbabilityCount,
-        resetWordRecords,
-        refreshVocabDisplay
+        resetWordRecords
     };
 })();
 
@@ -2559,18 +2576,26 @@ const InterventionController = (function() {
     let revealedIndices = new Set();
 
     /**
-     * Bug2修复：将当前 DetailPanel 主题应用到给定弹窗元素
+     * 将当前 DetailPanel 主题应用到干预弹窗（学习提醒/单词验证）
      * DetailPanel 的 dark-mode CSS 类通过层叠样式覆盖子元素，
      * 因此只需在弹窗根节点加上同一个 class 即可复用所有暗色样式。
      */
     function applyCurrentThemeToModal(el) {
         if (!el) return;
         const theme = DetailPanel.getCurrentTheme ? DetailPanel.getCurrentTheme() : 'light';
+        console.log('[B站学习助手] applyCurrentThemeToModal: theme=', theme, 'el=', el.id);
+        console.log('[B站学习助手]   DetailPanel.getCurrentTheme可用:', typeof DetailPanel.getCurrentTheme === 'function');
+        console.log('[B站学习助手]   当前classList:', el.className);
         if (theme === 'dark') {
             el.classList.add('bilibili-study-dark-mode');
+            // 修复内联样式覆盖问题：弹窗外层背景需要强制暗色
+            el.style.background = 'rgba(0, 0, 0, 0.85)';
+            console.log('[B站学习助手]   已添加dark-mode并设置暗色背景');
         } else {
             el.classList.remove('bilibili-study-dark-mode');
+            el.style.background = 'rgba(0, 0, 0, 0.5)';
         }
+        console.log('[B站学习助手]   最终classList:', el.className);
     }
 
     /**

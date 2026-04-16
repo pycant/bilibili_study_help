@@ -1,5 +1,27 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.0.9] - 2026-04-16
+
+### Bug修复 🐛
+
+#### 详细统计词库统计全部错误（Bug 1&4）
+- **根因**：`renderModule3()` 的"总单词数"来自 localStorage 答题记录数（5），而非词库配置数（362），导致更新词库后仍显示5词；"已掌握"同理，造成"词库已全部掌握"误报
+- **修复**：总单词数改用 `WordVerifier.parseVocabulary().length`（词库配置），已掌握数用 `Object.values(words).filter(w => w.mastered).length`（答过且已掌握）
+
+#### 刷新词库按钮无反应（Bug 2）
+- **根因**：`WordVerifier` 是独立 IIFE，`refreshVocabDisplay()` 试图调用 `DetailPanel` 内部的 `renderModule3()`/`handleResetVocabBtn`/`handleRefreshVocabBtn`，跨作用域引用导致 ReferenceError，被 addEventListener 静默吞掉
+- **修复**：将 `refreshVocabDisplay()` 移入 `DetailPanel` IIFE 内部，消除跨作用域调用；同时在函数内添加详细调试日志
+
+#### 词库更新不生效 + 重置后数据异常（Bug 3&5）
+- **根因**：`ConfigManager.load()` 用 `...parsed` 合并配置，localStorage 旧词库（5词）覆盖代码中的新词库（362词），词库更新根本没生效；重置后统计正确但可学习显示5而非357
+- **修复**：`load()` 中始终用 `vocabulary: USER_CONFIG.vocabulary`，确保使用代码中的最新词库
+
+#### 干预弹窗深色模式不生效
+- **根因**：`.bilibili-study-modal-overlay` 有 `rgba(0,0,0,0.5)` 内联背景，CSS 规则被覆盖；且 `applyCurrentThemeToModal` 未同步更新内联背景
+- **修复**：CSS 添加 `.bilibili-study-dark-mode .bilibili-study-modal-overlay { background: rgba(0,0,0,0.85) !important; }`；JS 中深色模式下强制设置内联背景；同时在函数内添加调试日志，方便定位主题判断问题
+
+---
+
 ## [1.0.8] - 2026-04-16
 
 ### 功能增强 ✨
