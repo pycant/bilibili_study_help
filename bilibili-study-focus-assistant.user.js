@@ -2872,22 +2872,28 @@ const InterventionController = (function() {
         
         let courseOptions = '';
         if (hasWhitelist) {
+            const isDark = DetailPanel.getCurrentTheme() === 'dark';
+            const ciBg = isDark ? 'rgba(40,45,55,0.8)' : 'white';
+            const ciBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e0e0e0';
+            const ciText = isDark ? '#999' : '#666';
+            const ctBg = isDark ? 'rgba(30,35,45,0.5)' : '#f8f9fa';
+            const ctLabel = isDark ? '#e0e0e0' : '#333';
             // 使用 data-index 属性而不是内联 onclick，避免模板字符串嵌套和引号冲突
             const courseItems = whitelist.map((course, index) => `
                             <div class="course-item" 
                                  data-index="${index}"
                                  data-bv="${course.bv.replace(/"/g, '&quot;')}"
                                  data-name="${course.name.replace(/"/g, '&quot;')}"
-                                 style="padding: 8px 12px; margin: 5px 0; background: white; 
-                                        border: 1px solid #e0e0e0; border-radius: 4px; 
+                                 style="padding: 8px 12px; margin: 5px 0; background: ${ciBg}; 
+                                        border: 1px solid ${ciBorder}; border-radius: 4px; 
                                         cursor: pointer; transition: all 0.2s;">
                                 <div style="font-weight: bold;">${course.name}</div>
-                                <div style="font-size: 12px; color: #666;">${course.bv}</div>
+                                <div style="font-size: 12px; color: ${ciText};">${course.bv}</div>
                             </div>
             `).join('');
             courseOptions = `
-                <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #333;">选择要返回的课程：</p>
+                <div style="margin: 15px 0; padding: 10px; background: ${ctBg}; border-radius: 6px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: ${ctLabel};">选择要返回的课程：</p>
                     <div id="bilibili-study-course-list" style="max-height: 200px; overflow-y: auto;">
                         ${courseItems}
                     </div>
@@ -2934,14 +2940,14 @@ const InterventionController = (function() {
 
                     // 清除所有选中状态
                     courseList.querySelectorAll('.course-item').forEach(el => {
-                        el.style.background = 'white';
-                        el.style.borderColor = '#e0e0e0';
+                        el.style.background = ciBg;
+                        el.style.borderColor = ciBorder;
                         el.removeAttribute('data-selected');
                     });
 
                     // 标记当前选中
-                    item.style.background = '#e3f2fd';
-                    item.style.borderColor = '#00a1d6';
+                    item.style.background = isDark ? 'rgba(0,100,200,0.25)' : '#e3f2fd';
+                    item.style.borderColor = isDark ? '#4da6ff' : '#00a1d6';
                     item.setAttribute('data-selected', 'true');
 
                     // 更新返回按钮
@@ -3071,21 +3077,22 @@ const InterventionController = (function() {
         const isFullyRevealed = indices.size >= word.english.length;
         const displayWord = getDisplayWord(word.english, indices);
         const revealedCount = indices.size;
+        const isDark = DetailPanel.getCurrentTheme() === 'dark';
 
         // 渐进提示文本
         let hintSection = '';
         if (revealedCount > 0 && !isFullyRevealed) {
-            hintSection = `<div class="bilibili-study-word-hint" style="text-align: center; margin: 10px 0; padding: 8px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
-                <small style="color: #e65100;">💡 提示: 已揭示 ${revealedCount}/${word.english.length} 个字母</small>
+            hintSection = `<div class="bilibili-study-word-hint" style="text-align: center; margin: 10px 0; padding: 8px; ${isDark ? 'background: rgba(255,152,0,0.12); border-radius: 6px; border: 1px solid rgba(255,152,0,0.25);' : 'background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;'}">
+                <small style="${isDark ? 'color: #ffab40;' : 'color: #e65100;'}">💡 提示: 已揭示 ${revealedCount}/${word.english.length} 个字母</small>
             </div>`;
         }
 
         // 全部揭示后的记忆提示
         let memorySection = '';
         if (isFullyRevealed) {
-            memorySection = `<div class="bilibili-study-word-memory" style="text-align: center; margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 6px; border: 1px solid #a5d6a7;">
-                <div class="bilibili-study-word-memory-word" style="font-size: 18px; font-weight: bold; color: #2e7d32; letter-spacing: 4px; font-family: monospace;">${word.english}</div>
-                <small style="color: #388e3c;">📖 记住这个单词，6秒后自动关闭...</small>
+            memorySection = `<div class="bilibili-study-word-memory" style="text-align: center; margin: 15px 0; padding: 12px; ${isDark ? 'background: rgba(76,175,80,0.12); border-radius: 6px; border: 1px solid rgba(76,175,80,0.25);' : 'background: #e8f5e9; border-radius: 6px; border: 1px solid #a5d6a7;'}">
+                <div class="bilibili-study-word-memory-word" style="font-size: 18px; font-weight: bold; ${isDark ? 'color: #81c784;' : 'color: #2e7d32;'} letter-spacing: 4px; font-family: monospace;">${word.english}</div>
+                <small style="${isDark ? 'color: #66bb6a;' : 'color: #388e3c;'}">📖 记住这个单词，6秒后自动关闭...</small>
             </div>`;
         }
 
@@ -3093,10 +3100,10 @@ const InterventionController = (function() {
         const bodyContent = `
             <p style="font-size: 18px; margin-bottom: 15px; text-align: center;">
                 请输入以下释义的英文单词：<br>
-                <strong class="bilibili-study-word-chinese" style="font-size: 24px; color: #00a1d6;">${word.chinese}</strong>
+                <strong class="bilibili-study-word-chinese" style="font-size: 24px; color: ${isDark ? '#64b5f6' : '#00a1d6'};">${word.chinese}</strong>
             </p>
             <div style="text-align: center; margin-bottom: 15px;">
-                <div class="bilibili-study-word-display" style="font-size: 22px; font-family: monospace; letter-spacing: 4px; color: #333;">
+                <div class="bilibili-study-word-display" style="font-size: 22px; font-family: monospace; letter-spacing: 4px; color: ${isDark ? '#e0e0e0' : '#333'};">
                     ${displayWord}
                 </div>
             </div>
@@ -3105,7 +3112,7 @@ const InterventionController = (function() {
             <input type="text" id="bilibili-study-word-input"
                    placeholder="${isFullyRevealed ? '记忆模式 - 请记住这个单词' : '请输入英文单词'}"
                    ${isFullyRevealed ? 'disabled' : ''}
-                   style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 15px; margin-top: 10px; box-sizing: border-box;">
+                   style="width: 100%; padding: 10px; font-size: 16px; ${isDark ? 'border: 1px solid rgba(255,255,255,0.15); background: rgba(40,45,55,0.8); color: #e0e0e0;' : 'border: 1px solid #ddd; background: white; color: #333;'} border-radius: 6px; margin-bottom: 15px; margin-top: 10px; box-sizing: border-box;">
             <div id="bilibili-study-word-feedback" style="text-align: center; font-size: 16px; margin-bottom: 10px; min-height: 24px;"></div>
             <div class="bilibili-study-action-buttons" style="justify-content: center;">
                 <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-word-submit"
@@ -3178,11 +3185,11 @@ const InterventionController = (function() {
         StatisticsTracker.recordWordAttempt(correct);
 
         if (correct) {
-            feedback.innerHTML = '<span style="color: #16a34a; font-weight: bold;">✅ 回答正确！</span>';
+            feedback.innerHTML = `<span style="color: ${isDark ? '#4ade80' : '#16a34a'}; font-weight: bold;">✅ 回答正确！</span>`;
             // 正确答案直接关闭
             setTimeout(() => closeCurrentModal(), 300);
         } else {
-            feedback.innerHTML = '<span style="color: #dc2626; font-weight: bold;">❌ 回答错误，再试一次</span>';
+            feedback.innerHTML = `<span style="color: ${isDark ? '#f87171' : '#dc2626'}; font-weight: bold;">❌ 回答错误，再试一次</span>`;
 
             // 随机揭示1-3个新字母
             const totalLength = currentWord.english.length;
