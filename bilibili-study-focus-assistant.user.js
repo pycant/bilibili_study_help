@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.0.9
+// @version      1.2.0
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -9,6 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
+// @grant        unsafeWindow
 // @license      MIT
 // @supportURL   https://github.com/bilibili-study-focus/issues
 // ==/UserScript==
@@ -636,6 +637,348 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-word-revealed {
         color: #4ade80 !important;
     }
+
+    /* Settings Panel */
+    .bilibili-study-settings-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: bilibili-study-fade-in 0.2s ease-out;
+    }
+
+    .bilibili-study-settings-modal {
+        background: #fff;
+        border-radius: 12px;
+        width: 92%;
+        max-width: 520px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        animation: bilibili-study-slide-up 0.2s ease-out;
+    }
+
+    .bilibili-study-settings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .bilibili-study-settings-header h3 {
+        margin: 0;
+        font-size: 17px;
+        color: #333;
+    }
+
+    .bilibili-study-settings-tabs {
+        display: flex;
+        border-bottom: 1px solid #eee;
+        padding: 0 12px;
+    }
+
+    .bilibili-study-settings-tab {
+        padding: 10px 16px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        background: none;
+        color: #666;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .bilibili-study-settings-tab:hover {
+        color: #00a1d6;
+    }
+
+    .bilibili-study-settings-tab.active {
+        color: #00a1d6;
+        border-bottom-color: #00a1d6;
+        font-weight: 600;
+    }
+
+    .bilibili-study-settings-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 18px;
+    }
+
+    .bilibili-study-settings-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 12px 18px;
+        border-top: 1px solid #eee;
+    }
+
+    .bilibili-study-settings-group {
+        margin-bottom: 16px;
+    }
+
+    .bilibili-study-settings-group-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        margin: 0 0 8px 0;
+    }
+
+    .bilibili-study-settings-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .bilibili-study-settings-row input[type="text"],
+    .bilibili-study-settings-row input[type="time"],
+    .bilibili-study-settings-row textarea {
+        flex: 1;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .bilibili-study-settings-row input:focus,
+    .bilibili-study-settings-row textarea:focus {
+        border-color: #00a1d6;
+    }
+
+    .bilibili-study-settings-row textarea {
+        min-height: 120px;
+        resize: vertical;
+        font-family: monospace;
+        line-height: 1.6;
+    }
+
+    .bilibili-study-settings-hint {
+        font-size: 12px;
+        color: #888;
+        margin: 4px 0 0 0;
+    }
+
+    .bilibili-study-settings-error {
+        font-size: 12px;
+        color: #e53935;
+        margin: 4px 0 0 0;
+    }
+
+    .bilibili-study-settings-period-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        background: #f0f0f0;
+        border-radius: 6px;
+        margin-bottom: 6px;
+    }
+
+    .bilibili-study-settings-period-item input {
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        width: 90px;
+    }
+
+    .bilibili-study-settings-period-item input:focus {
+        border-color: #00a1d6;
+        outline: none;
+    }
+
+    .bilibili-study-settings-period-arrow {
+        color: #999;
+        font-size: 14px;
+    }
+
+    .bilibili-study-settings-remove-btn {
+        background: none;
+        border: none;
+        color: #e53935;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+
+    .bilibili-study-settings-remove-btn:hover {
+        background: #ffebee;
+    }
+
+    .bilibili-study-settings-whitelist-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        background: #f0f0f0;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        gap: 8px;
+    }
+
+    .bilibili-study-settings-whitelist-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bilibili-study-settings-whitelist-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #333;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bilibili-study-settings-whitelist-bv {
+        font-size: 12px;
+        color: #888;
+    }
+
+    .bilibili-study-settings-add-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .bilibili-study-settings-add-row input {
+        flex: 1;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .bilibili-study-settings-add-row input:focus {
+        border-color: #00a1d6;
+        outline: none;
+    }
+
+    .bilibili-study-settings-toast {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-100%);
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 9999999;
+        transition: transform 0.3s ease;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+
+    .bilibili-study-settings-toast.show {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    .bilibili-study-settings-toast-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
+    }
+
+    .bilibili-study-settings-toast-error {
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ef9a9a;
+    }
+
+    /* Dark mode for settings */
+    .bilibili-study-dark-mode .bilibili-study-settings-modal {
+        background: #1e1e1e !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-header {
+        border-bottom-color: #3a3a3a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-header h3 {
+        color: #e0e0e0 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-tabs {
+        border-bottom-color: #3a3a3a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-tab {
+        color: #999 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-tab.active {
+        color: #00a1d6 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-body {
+        background: #1e1e1e !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-footer {
+        border-top-color: #3a3a3a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-group-title {
+        color: #e0e0e0 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-row input,
+    .bilibili-study-dark-mode .bilibili-study-settings-row textarea,
+    .bilibili-study-dark-mode .bilibili-study-settings-add-row input,
+    .bilibili-study-dark-mode .bilibili-study-settings-period-item input {
+        background: #2a2a2a !important;
+        color: #e0e0e0 !important;
+        border-color: #444 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-row textarea {
+        background: #2a2a2a !important;
+        color: #e0e0e0 !important;
+        border-color: #444 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-hint {
+        color: #666 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-error {
+        color: #ef5350 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-period-item {
+        background: #2a2a2a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-whitelist-item {
+        background: #2a2a2a !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-whitelist-name {
+        color: #e0e0e0 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-whitelist-bv {
+        color: #888 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-toast-success {
+        background: #1a3d1a !important;
+        color: #4ade80 !important;
+        border-color: #2d5a2d !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-toast-error {
+        background: #3d1a1a !important;
+        color: #f87171 !important;
+        border-color: #5a2d2d !important;
+    }
 `;
 
 // Inject CSS
@@ -813,12 +1156,20 @@ const ConfigManager = (function() {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) {
                 const parsed = JSON.parse(stored);
+                // 调试：输出 localStorage 中存储的 studyPeriods
+                console.log('[B站学习助手] ConfigManager.load: localStorage studyPeriods =', JSON.stringify(parsed.studyPeriods));
                 // Merge with defaults to ensure all fields exist
+                // 策略：localStorage 有有效值就用 localStorage 的，否则用代码默认值
+                const hasValidPeriods = Array.isArray(parsed.studyPeriods) && parsed.studyPeriods.length > 0;
+                const hasValidVocab = Array.isArray(parsed.vocabulary) && parsed.vocabulary.length > 0;
                 currentConfig = {
                     ...USER_CONFIG,
                     ...parsed,
-                    // 词库始终用代码中的最新值，防止 localStorage 旧词库（5词）覆盖新词库（362词）
-                    vocabulary: USER_CONFIG.vocabulary,
+                    // 词库：localStorage 有效则用 localStorage 的（用户可能通过设置面板修改过）
+                    // localStorage 无效（空/不存在）则用代码默认值（362词）
+                    vocabulary: hasValidVocab ? parsed.vocabulary : USER_CONFIG.vocabulary,
+                    // 学习时段：同上策略
+                    studyPeriods: hasValidPeriods ? parsed.studyPeriods : USER_CONFIG.studyPeriods,
                     floatingWindow: {
                         ...USER_CONFIG.floatingWindow,
                         ...(parsed.floatingWindow || {})
@@ -859,14 +1210,34 @@ const ConfigManager = (function() {
     }
 
     // Check if current time is within study periods
+    let _isStudyTimeDebugLogged = false;
     function isStudyTime() {
         const config = get();
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
         if (!config.studyPeriods || config.studyPeriods.length === 0) {
+            if (!_isStudyTimeDebugLogged) {
+                _isStudyTimeDebugLogged = true;
+                console.warn('[B站学习助手] isStudyTime: studyPeriods 为空！', config.studyPeriods);
+            }
             return false;
         }
 
-        const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        // 首次调用时输出详细调试
+        if (!_isStudyTimeDebugLogged) {
+            _isStudyTimeDebugLogged = true;
+            const debugPeriods = config.studyPeriods.map((p, i) => {
+                const s = parseTimeToMinutes(p[0]);
+                const e = parseTimeToMinutes(p[1]);
+                return { index: i, start: p[0], end: p[1], startMin: s, endMin: e, inRange: s <= e ? (currentMinutes >= s && currentMinutes < e) : (currentMinutes >= s || currentMinutes < e) };
+            });
+            console.log('[B站学习助手] isStudyTime 调试:', {
+                currentMinutes,
+                currentTime: `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`,
+                periods: debugPeriods
+            });
+        }
 
         for (const period of config.studyPeriods) {
             const startMinutes = parseTimeToMinutes(period[0]);
@@ -2055,6 +2426,12 @@ const DetailPanel = (function() {
                     <h2>学习专注助手 - 详细统计</h2>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <button class="bilibili-study-btn bilibili-study-btn-secondary" 
+                                id="bilibili-study-open-settings"
+                                style="padding: 6px 12px; font-size: 14px; cursor: pointer;"
+                                title="参数设置">
+                            ⚙️ 设置
+                        </button>
+                        <button class="bilibili-study-btn bilibili-study-btn-secondary" 
                                 id="bilibili-study-theme-toggle"
                                 style="padding: 6px 12px; font-size: 18px; cursor: pointer;"
                                 title="切换主题">
@@ -2093,6 +2470,15 @@ const DetailPanel = (function() {
             themeToggleBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 toggleTheme();
+            });
+        }
+
+        // Settings button
+        const settingsBtn = document.getElementById('bilibili-study-open-settings');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openSettings();
             });
         }
 
@@ -2236,13 +2622,441 @@ const DetailPanel = (function() {
         });
     }
 
+    // ==========================================
+    // Settings Panel (配置编辑器)
+    // ==========================================
+    let settingsElement = null;
+    let activeSettingsTab = 'periods'; // 'periods' | 'whitelist' | 'vocab'
+
+    function openSettings() {
+        if (settingsElement) {
+            settingsElement.remove();
+            settingsElement = null;
+        }
+
+        settingsElement = document.createElement('div');
+        settingsElement.className = 'bilibili-study-settings-overlay';
+        settingsElement.id = 'bilibili-study-settings-overlay';
+
+        const config = ConfigManager.get();
+        const isDark = currentTheme === 'dark';
+
+        settingsElement.innerHTML = `
+            <div class="bilibili-study-settings-modal ${isDark ? 'bilibili-study-dark-mode' : ''}">
+                <div class="bilibili-study-settings-header">
+                    <h3>⚙️ 参数设置</h3>
+                    <button class="bilibili-study-modal-close" id="bilibili-study-settings-close">&times;</button>
+                </div>
+                <div class="bilibili-study-settings-tabs">
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'periods' ? 'active' : ''}" data-tab="periods">⏰ 学习时段</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'whitelist' ? 'active' : ''}" data-tab="whitelist">📚 学习视频</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'vocab' ? 'active' : ''}" data-tab="vocab">📝 词库管理</button>
+                </div>
+                <div class="bilibili-study-settings-body" id="bilibili-study-settings-body">
+                    ${renderSettingsContent(activeSettingsTab, config)}
+                </div>
+                <div class="bilibili-study-settings-footer">
+                    <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-settings-cancel">取消</button>
+                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-settings-save">💾 保存</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(settingsElement);
+        bindSettingsEvents();
+    }
+
+    function closeSettings() {
+        if (settingsElement) {
+            settingsElement.remove();
+            settingsElement = null;
+        }
+    }
+
+    function renderSettingsContent(tab, config) {
+        switch (tab) {
+            case 'periods': return renderPeriodsSettings(config);
+            case 'whitelist': return renderWhitelistSettings(config);
+            case 'vocab': return renderVocabSettings(config);
+            default: return renderPeriodsSettings(config);
+        }
+    }
+
+    function renderPeriodsSettings(config) {
+        const periods = config.studyPeriods || [];
+        let periodsHtml = periods.map((p, i) => `
+            <div class="bilibili-study-settings-period-item" data-index="${i}">
+                <input type="time" class="bilibili-study-period-start" value="${p[0]}" data-index="${i}">
+                <span class="bilibili-study-settings-period-arrow">→</span>
+                <input type="time" class="bilibili-study-period-end" value="${p[1]}" data-index="${i}">
+                <button class="bilibili-study-settings-remove-btn" data-index="${i}" title="删除此时段">✕</button>
+            </div>
+        `).join('');
+
+        if (!periodsHtml) {
+            periodsHtml = '<div style="color: #888; font-size: 14px; padding: 10px 0;">暂无学习时段，请点击下方添加</div>';
+        }
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">学习时段</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">设定每天的专注学习时间段，仅在此时段内才会触发专注提醒</p>
+                <div id="bilibili-study-periods-list">
+                    ${periodsHtml}
+                </div>
+                <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-add-period" style="margin-top: 8px; font-size: 13px;">+ 添加时段</button>
+            </div>
+        `;
+    }
+
+    function renderWhitelistSettings(config) {
+        const whitelist = ConfigManager.getWhitelistArray();
+        let listHtml = whitelist.map(item => `
+            <div class="bilibili-study-settings-whitelist-item" data-bv="${item.bv}">
+                <div class="bilibili-study-settings-whitelist-info">
+                    <div class="bilibili-study-settings-whitelist-name">${item.name}</div>
+                    <div class="bilibili-study-settings-whitelist-bv">${item.bv}</div>
+                </div>
+                <button class="bilibili-study-settings-remove-btn" data-bv="${item.bv}" title="移除此视频">✕</button>
+            </div>
+        `).join('');
+
+        if (!listHtml) {
+            listHtml = '<div style="color: #888; font-size: 14px; padding: 10px 0;">白名单为空，请添加学习视频</div>';
+        }
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">学习视频（白名单）</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">白名单中的视频不会触发专注干预</p>
+                <div id="bilibili-study-whitelist-list">
+                    ${listHtml}
+                </div>
+                <div class="bilibili-study-settings-add-row" style="margin-top: 10px;">
+                    <input type="text" id="bilibili-study-new-bv" placeholder="输入BV号（如 BV1xx411c7mD）">
+                    <input type="text" id="bilibili-study-new-name" placeholder="课程名称" style="max-width: 120px;">
+                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-add-whitelist-btn" style="white-space: nowrap; font-size: 13px;">添加</button>
+                </div>
+                <div id="bilibili-study-whitelist-error" class="bilibili-study-settings-error"></div>
+            </div>
+        `;
+    }
+
+    function renderVocabSettings(config) {
+        const vocab = config.vocabulary || [];
+        const total = vocab.length;
+        // 格式化为每行一个 "中文:英文"
+        const vocabText = vocab.join('\n');
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">词库管理</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 4px 0;">当前词库共 <strong>${total}</strong> 个词条</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">格式：每行一个词条，中文和英文用英文冒号分隔，如 "学习:study"</p>
+                <div class="bilibili-study-settings-row">
+                    <textarea id="bilibili-study-vocab-textarea" placeholder="学习:study&#10;专注:focus&#10;进步:progress">${vocabText}</textarea>
+                </div>
+                <div id="bilibili-study-vocab-error" class="bilibili-study-settings-error"></div>
+                <div id="bilibili-study-vocab-preview" class="bilibili-study-settings-hint"></div>
+            </div>
+        `;
+    }
+
+    function bindSettingsEvents() {
+        // 关闭按钮
+        const closeBtn = document.getElementById('bilibili-study-settings-close');
+        if (closeBtn) closeBtn.addEventListener('click', closeSettings);
+
+        // 点击遮罩关闭
+        if (settingsElement) {
+            settingsElement.addEventListener('click', function(e) {
+                if (e.target === settingsElement) closeSettings();
+            });
+        }
+
+        // 取消按钮
+        const cancelBtn = document.getElementById('bilibili-study-settings-cancel');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeSettings);
+
+        // Tab 切换
+        const tabs = settingsElement.querySelectorAll('.bilibili-study-settings-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                activeSettingsTab = this.dataset.tab;
+                // 更新 tab 样式
+                tabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                // 更新内容区
+                const body = document.getElementById('bilibili-study-settings-body');
+                if (body) {
+                    const config = ConfigManager.get();
+                    body.innerHTML = renderSettingsContent(activeSettingsTab, config);
+                    bindSettingsTabEvents();
+                }
+            });
+        });
+
+        // 保存按钮
+        const saveBtn = document.getElementById('bilibili-study-settings-save');
+        if (saveBtn) saveBtn.addEventListener('click', saveSettings);
+
+        // 各 tab 内的事件
+        bindSettingsTabEvents();
+    }
+
+    function bindSettingsTabEvents() {
+        // === 学习时段 tab ===
+        // 删除时段
+        document.querySelectorAll('.bilibili-study-settings-period-item .bilibili-study-settings-remove-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const idx = parseInt(this.dataset.index);
+                this.closest('.bilibili-study-settings-period-item').remove();
+                // 重新编号
+                document.querySelectorAll('.bilibili-study-settings-period-item').forEach((item, i) => {
+                    item.dataset.index = i;
+                    item.querySelectorAll('input').forEach(inp => inp.dataset.index = i);
+                    item.querySelector('.bilibili-study-settings-remove-btn').dataset.index = i;
+                });
+            });
+        });
+
+        // 添加时段
+        const addPeriodBtn = document.getElementById('bilibili-study-add-period');
+        if (addPeriodBtn) {
+            addPeriodBtn.addEventListener('click', function() {
+                const list = document.getElementById('bilibili-study-periods-list');
+                if (!list) return;
+                const idx = list.querySelectorAll('.bilibili-study-settings-period-item').length;
+                const div = document.createElement('div');
+                div.className = 'bilibili-study-settings-period-item';
+                div.dataset.index = idx;
+                div.innerHTML = `
+                    <input type="time" class="bilibili-study-period-start" value="08:00" data-index="${idx}">
+                    <span class="bilibili-study-settings-period-arrow">→</span>
+                    <input type="time" class="bilibili-study-period-end" value="12:00" data-index="${idx}">
+                    <button class="bilibili-study-settings-remove-btn" data-index="${idx}" title="删除此时段">✕</button>
+                `;
+                list.appendChild(div);
+                // 绑定删除事件
+                div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
+                    div.remove();
+                });
+            });
+        }
+
+        // === 白名单 tab ===
+        // 删除白名单项
+        document.querySelectorAll('.bilibili-study-settings-whitelist-item .bilibili-study-settings-remove-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.bilibili-study-settings-whitelist-item').remove();
+            });
+        });
+
+        // 添加白名单
+        const addWhitelistBtn = document.getElementById('bilibili-study-add-whitelist-btn');
+        if (addWhitelistBtn) {
+            addWhitelistBtn.addEventListener('click', function() {
+                const bvInput = document.getElementById('bilibili-study-new-bv');
+                const nameInput = document.getElementById('bilibili-study-new-name');
+                const errorDiv = document.getElementById('bilibili-study-whitelist-error');
+                const bv = (bvInput.value || '').trim();
+                const name = (nameInput.value || '').trim();
+
+                // 验证
+                if (!bv) {
+                    if (errorDiv) errorDiv.textContent = '请输入BV号';
+                    return;
+                }
+                if (!/^BV[\w]+$/i.test(bv)) {
+                    if (errorDiv) errorDiv.textContent = 'BV号格式不正确，应以 BV 开头';
+                    return;
+                }
+                // 检查重复
+                const existing = document.querySelectorAll('.bilibili-study-settings-whitelist-item');
+                for (const item of existing) {
+                    if (item.dataset.bv === bv) {
+                        if (errorDiv) errorDiv.textContent = '该BV号已在白名单中';
+                        return;
+                    }
+                }
+
+                if (errorDiv) errorDiv.textContent = '';
+
+                // 添加到列表
+                const list = document.getElementById('bilibili-study-whitelist-list');
+                if (list) {
+                    const div = document.createElement('div');
+                    div.className = 'bilibili-study-settings-whitelist-item';
+                    div.dataset.bv = bv;
+                    div.innerHTML = `
+                        <div class="bilibili-study-settings-whitelist-info">
+                            <div class="bilibili-study-settings-whitelist-name">${name || bv}</div>
+                            <div class="bilibili-study-settings-whitelist-bv">${bv}</div>
+                        </div>
+                        <button class="bilibili-study-settings-remove-btn" data-bv="${bv}" title="移除此视频">✕</button>
+                    `;
+                    list.appendChild(div);
+                    div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
+                        div.remove();
+                    });
+                    bvInput.value = '';
+                    nameInput.value = '';
+                }
+            });
+        }
+
+        // === 词库 tab ===
+        const vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
+        if (vocabTextarea) {
+            // 实时预览词数
+            vocabTextarea.addEventListener('input', function() {
+                const lines = this.value.split('\n').filter(l => l.trim());
+                const validLines = lines.filter(l => /^.+:.+$/.test(l.trim()));
+                const invalidCount = lines.length - validLines.length;
+                const previewDiv = document.getElementById('bilibili-study-vocab-preview');
+                if (previewDiv) {
+                    if (invalidCount > 0) {
+                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条，<span style="color: #e53935;">${invalidCount} 行格式错误</span>（需使用 "中文:英文" 格式）`;
+                    } else {
+                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条`;
+                    }
+                }
+            });
+            // 触发一次预览
+            vocabTextarea.dispatchEvent(new Event('input'));
+        }
+    }
+
+    function saveSettings() {
+        const errors = [];
+        let hasChanges = false;
+
+        // === 保存学习时段 ===
+        if (activeSettingsTab === 'periods' || true) { // 始终保存所有
+            const periodItems = settingsElement?.querySelectorAll('.bilibili-study-settings-period-item');
+            if (periodItems) {
+                const newPeriods = [];
+                periodItems.forEach(item => {
+                    const start = item.querySelector('.bilibili-study-period-start')?.value;
+                    const end = item.querySelector('.bilibili-study-period-end')?.value;
+                    if (start && end) {
+                        newPeriods.push([start, end]);
+                    } else if (start || end) {
+                        errors.push('存在不完整的学习时段（缺少开始或结束时间）');
+                    }
+                });
+                const oldPeriods = ConfigManager.get().studyPeriods || [];
+                if (JSON.stringify(newPeriods) !== JSON.stringify(oldPeriods)) {
+                    ConfigManager.save({ studyPeriods: newPeriods });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // === 保存白名单 ===
+        if (activeSettingsTab === 'whitelist' || true) {
+            const whitelistItems = settingsElement?.querySelectorAll('.bilibili-study-settings-whitelist-item');
+            if (whitelistItems) {
+                const newWhitelist = {};
+                whitelistItems.forEach(item => {
+                    const bv = item.dataset.bv;
+                    const nameEl = item.querySelector('.bilibili-study-settings-whitelist-name');
+                    const name = nameEl ? nameEl.textContent : bv;
+                    if (bv) {
+                        newWhitelist[bv] = { name, addedAt: Date.now() };
+                    }
+                });
+                const oldWhitelist = ConfigManager.get().whitelist || {};
+                if (JSON.stringify(newWhitelist) !== JSON.stringify(oldWhitelist)) {
+                    ConfigManager.save({ whitelist: newWhitelist });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // === 保存词库 ===
+        if (activeSettingsTab === 'vocab' || true) {
+            const vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
+            if (vocabTextarea) {
+                const lines = vocabTextarea.value.split('\n').filter(l => l.trim());
+                const newVocab = [];
+                const invalidLines = [];
+
+                lines.forEach((line, i) => {
+                    const trimmed = line.trim();
+                    if (/^.+:.+$/.test(trimmed)) {
+                        const [chinese, ...rest] = trimmed.split(':');
+                        const english = rest.join(':').trim(); // 支持英文中包含冒号
+                        if (chinese.trim() && english) {
+                            newVocab.push(`${chinese.trim()}:${english.trim().toLowerCase()}`);
+                        }
+                    } else if (trimmed) {
+                        invalidLines.push(i + 1);
+                    }
+                });
+
+                if (invalidLines.length > 0) {
+                    errors.push(`词库第 ${invalidLines.slice(0, 5).join(', ')}${invalidLines.length > 5 ? '...' : ''} 行格式错误，需使用 "中文:英文" 格式`);
+                }
+
+                const oldVocab = ConfigManager.get().vocabulary || [];
+                if (newVocab.length > 0 && JSON.stringify(newVocab) !== JSON.stringify(oldVocab)) {
+                    ConfigManager.save({ vocabulary: newVocab });
+                    hasChanges = true;
+                } else if (newVocab.length === 0 && oldVocab.length > 0) {
+                    errors.push('词库不能为空，至少需要1个词条');
+                }
+            }
+        }
+
+        // 反馈
+        if (errors.length > 0) {
+            showSettingsToast(errors[0], 'error');
+            return;
+        }
+
+        closeSettings();
+
+        if (hasChanges) {
+            showSettingsToast('✅ 配置已保存，正在刷新面板…', 'success');
+            // 刷新详情面板
+            setTimeout(() => {
+                close(); // 关闭当前详情面板
+                setTimeout(() => open(), 200); // 重新打开以加载新配置
+            }, 800);
+        } else {
+            showSettingsToast('配置无变化', 'success');
+        }
+    }
+
+    // 设置面板的 Toast 反馈
+    function showSettingsToast(message, type) {
+        const existing = document.querySelector('.bilibili-study-settings-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = `bilibili-study-settings-toast bilibili-study-settings-toast-${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     return {
         open,
         close,
         isOpen: function() { return isOpen; },
         getCurrentTheme: function() { return currentTheme; },
         detectTheme: detectBilibiliTheme,
-        loadTheme: loadTheme
+        loadTheme: loadTheme,
+        openSettings
     };
 })();
 
@@ -3356,6 +4170,9 @@ const InterventionController = (function() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // 调试日志节流：check() 每秒调用一次，只在状态变化时输出
+    let _lastCheckLogKey = '';
+
     function check() {
         const state = window.__bilibiliStudyAppState;
         if (!state) return;
@@ -3365,6 +4182,18 @@ const InterventionController = (function() {
         const isStudyTime = ConfigManager.isStudyTime();
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
+
+        // 调试日志：节流输出（状态变化时才打日志，避免刷屏）
+        const logKey = `${isVideoPage}|${isPageActive}|${isStudyTime}|${isWhitelisted}|${currentBV}|${state.currentStage}|${state.distractionStartTime}`;
+        if (logKey !== _lastCheckLogKey) {
+            _lastCheckLogKey = logKey;
+            console.log('[B站学习助手] check: 状态变化 →', {
+                isVideoPage, isPageActive, isStudyTime, isWhitelisted,
+                currentBV, currentStage: state.currentStage,
+                distractionStartTime: state.distractionStartTime,
+                url: window.location.href
+            });
+        }
 
         if (!isVideoPage || !isPageActive) {
             return;
@@ -3485,6 +4314,12 @@ const InterventionController = (function() {
         isStudying: true,
         lastDistractionCount: 0
     };
+    // 同时暴露到真实 window（控制台可调试），需要 unsafeWindow
+    try {
+        if (typeof unsafeWindow !== 'undefined') {
+            unsafeWindow.__bilibiliStudyAppState = window.__bilibiliStudyAppState;
+        }
+    } catch(e) { /* 沙箱限制，忽略 */ }
 
     // Initialize config
     ConfigManager.load();
@@ -3548,15 +4383,30 @@ const InterventionController = (function() {
 
     // Main timer loop - runs every second
     console.log('[B站学习助手] init: 启动主定时器(1秒)');
+    let _mainTimerLogCounter = 0;
     setInterval(function() {
         const state = window.__bilibiliStudyAppState;
-        if (!state) return;
+        if (!state) {
+            // 每30秒输出一次，避免刷屏
+            if (++_mainTimerLogCounter % 30 === 0) {
+                console.warn('[B站学习助手] 主定时器: state 为空！');
+            }
+            return;
+        }
 
         const isVideoPage = PageMonitor.isVideoPage();
         const isPageActive = PageMonitor.isPageActive();
         const isStudyTime = ConfigManager.isStudyTime();
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
+
+        // 每60秒输出一次心跳日志，确认定时器在运行
+        if (++_mainTimerLogCounter % 60 === 0) {
+            console.log('[B站学习助手] 主定时器心跳:', {
+                isVideoPage, isPageActive, isStudyTime, isWhitelisted,
+                currentBV, currentStage: state.currentStage, url: window.location.href
+            });
+        }
 
         // Update statistics based on current state
         if (isVideoPage && isPageActive && isStudyTime) {

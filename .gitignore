@@ -4,7 +4,7 @@
 
 # ---- AI 工具文件（含工作记忆、专家历史，不应公开） ----
 .workbuddy/
-
+.kiro/
 # ---- Node.js / 包管理器 ----
 node_modules/
 package-lock.json
