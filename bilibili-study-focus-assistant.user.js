@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.1
+// @version      1.2.2
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -157,6 +157,32 @@ const STYLES = `
         gap: 10px;
         margin-top: 12px;
         flex-wrap: wrap;
+    }
+
+    /* 白名单添加弹窗样式 */
+    .bilibili-study-whitelist-modal-desc {
+        font-size: 14px;
+        margin-bottom: 10px;
+        color: #666;
+    }
+    .bilibili-study-whitelist-modal-field {
+        margin-bottom: 15px;
+    }
+    .bilibili-study-whitelist-modal-label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+    }
+    .bilibili-study-whitelist-modal-input {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        box-sizing: border-box;
+    }
+    .bilibili-study-whitelist-modal-hint {
+        color: #999;
     }
 
     .bilibili-study-btn {
@@ -567,6 +593,22 @@ const STYLES = `
     .bilibili-study-dark-mode small {
         color: #777 !important;
     }
+
+    /* 白名单添加弹窗 - 暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-whitelist-modal-desc {
+        color: #aaa !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-whitelist-modal-label {
+        color: #ccc !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-whitelist-modal-input {
+        background: #2a2a2a !important;
+        color: #e0e0e0 !important;
+        border-color: #444 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-whitelist-modal-hint {
+        color: #777 !important;
+    }
     
     .bilibili-study-dark-mode .course-item {
         background: #2a2a2a !important;
@@ -771,6 +813,16 @@ const STYLES = `
         margin: 4px 0 0 0;
     }
 
+    .bilibili-study-settings-empty-hint {
+        color: #888;
+        font-size: 14px;
+        padding: 10px 0;
+    }
+
+    .bilibili-study-vocab-error-count {
+        color: #e53935;
+    }
+
     .bilibili-study-settings-period-item {
         display: flex;
         align-items: center;
@@ -949,6 +1001,14 @@ const STYLES = `
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-error {
+        color: #ef5350 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-settings-empty-hint {
+        color: #888 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-vocab-error-count {
         color: #ef5350 !important;
     }
 
@@ -2566,17 +2626,17 @@ const DetailPanel = (function() {
                     <h2>📚 添加到白名单</h2>
                 </div>
                 <div class="bilibili-study-modal-body">
-                    <p style="font-size: 14px; margin-bottom: 10px; color: #666;">
+                    <p class="bilibili-study-whitelist-modal-desc">
                         当前视频：${currentBV}
                     </p>
-                    <div style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-size: 14px;">课程名称（可选）：</label>
+                    <div class="bilibili-study-whitelist-modal-field">
+                        <label class="bilibili-study-whitelist-modal-label">课程名称（可选）：</label>
                         <input type="text" id="bilibili-study-whitelist-course-name"
-                               placeholder="例如：高等数学第一章"
-                               style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;">
-                        <small style="color: #999;">留空将使用视频BV号作为名称</small>
+                               class="bilibili-study-whitelist-modal-input"
+                               placeholder="例如：高等数学第一章">
+                        <small class="bilibili-study-whitelist-modal-hint">留空将使用视频BV号作为名称</small>
                     </div>
-                    <div id="bilibili-study-whitelist-error" style="color: #dc2626; font-size: 14px; margin-bottom: 10px; display: none;"></div>
+                    <div id="bilibili-study-whitelist-error" class="bilibili-study-settings-error"></div>
                     <div class="bilibili-study-action-buttons" style="justify-content: center;">
                         <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-whitelist-confirm">
                             确认添加
@@ -2694,7 +2754,7 @@ const DetailPanel = (function() {
         `).join('');
 
         if (!periodsHtml) {
-            periodsHtml = '<div style="color: #888; font-size: 14px; padding: 10px 0;">暂无学习时段，请点击下方添加</div>';
+            periodsHtml = '<div class="bilibili-study-settings-empty-hint">暂无学习时段，请点击下方添加</div>';
         }
 
         return `
@@ -2722,7 +2782,7 @@ const DetailPanel = (function() {
         `).join('');
 
         if (!listHtml) {
-            listHtml = '<div style="color: #888; font-size: 14px; padding: 10px 0;">白名单为空，请添加学习视频</div>';
+            listHtml = '<div class="bilibili-study-settings-empty-hint">白名单为空，请添加学习视频</div>';
         }
 
         return `
@@ -2916,7 +2976,7 @@ const DetailPanel = (function() {
                 const previewDiv = document.getElementById('bilibili-study-vocab-preview');
                 if (previewDiv) {
                     if (invalidCount > 0) {
-                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条，<span style="color: #e53935;">${invalidCount} 行格式错误</span>（需使用 "中文:英文" 格式）`;
+                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条，<span class="bilibili-study-vocab-error-count">${invalidCount} 行格式错误</span>（需使用 "中文:英文" 格式）`;
                     } else {
                         previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条`;
                     }
