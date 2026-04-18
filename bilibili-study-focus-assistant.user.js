@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.0
+// @version      1.2.1
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -2931,8 +2931,8 @@ const DetailPanel = (function() {
         const errors = [];
         let hasChanges = false;
 
-        // === 保存学习时段 ===
-        if (activeSettingsTab === 'periods' || true) { // 始终保存所有
+        // === 保存学习时段 ===（只保存当前激活的 tab）
+        if (activeSettingsTab === 'periods') {
             const periodItems = settingsElement?.querySelectorAll('.bilibili-study-settings-period-item');
             if (periodItems) {
                 const newPeriods = [];
@@ -2954,9 +2954,9 @@ const DetailPanel = (function() {
         }
 
         // === 保存白名单 ===
-        if (activeSettingsTab === 'whitelist' || true) {
+        if (activeSettingsTab === 'whitelist') {
             const whitelistItems = settingsElement?.querySelectorAll('.bilibili-study-settings-whitelist-item');
-            if (whitelistItems) {
+            if (whitelistItems && whitelistItems.length > 0) {
                 const newWhitelist = {};
                 whitelistItems.forEach(item => {
                     const bv = item.dataset.bv;
@@ -2971,11 +2971,18 @@ const DetailPanel = (function() {
                     ConfigManager.save({ whitelist: newWhitelist });
                     hasChanges = true;
                 }
+            } else if (whitelistItems && whitelistItems.length === 0) {
+                // 用户主动清空了所有白名单
+                const oldWhitelist = ConfigManager.get().whitelist || {};
+                if (Object.keys(oldWhitelist).length > 0) {
+                    ConfigManager.save({ whitelist: {} });
+                    hasChanges = true;
+                }
             }
         }
 
         // === 保存词库 ===
-        if (activeSettingsTab === 'vocab' || true) {
+        if (activeSettingsTab === 'vocab') {
             const vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
             if (vocabTextarea) {
                 const lines = vocabTextarea.value.split('\n').filter(l => l.trim());
