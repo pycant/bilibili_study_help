@@ -1,5 +1,49 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.2.5] - 2026-04-20
+
+### 暗色模式全面扫尾 🎨
+
+#### 内联样式 class 化
+- **词库警告区**（⚠️ 词库不足 / 🔴 全部掌握）：从硬编码内联样式 → 专用 class（`.bilibili-study-vocab-warning/critical` 及子元素），暗色模式使用半透明橙色/红色替代亮色背景
+- **模块头部操作栏**（📚 单词学习 / 📼 历史视频）：从内联 flex 布局 → `.bilibili-study-module-header` + `.bilibili-study-module-actions`
+- **小按钮**：新增 `.bilibili-study-btn-sm`（含 primary/secondary 变体），统一管理，暗色模式适配
+- **锁定面板**（🔒 学习时段内不可查看）：从内联样式 → `.bilibili-study-locked-panel`，opacity 从 0.6 调为 0.7
+- **历史视频列表项**：从内联样式 → `.bilibili-study-history-item/link/title/meta/right/time/reason`，暗色模式独立文字颜色
+
+#### 暗色模式色板统一
+| 元素类型 | 色值 | 对比度 |
+|---------|------|--------|
+| 主要文字 | `#eee` / `#e0e0e0` | ~15:1 |
+| 次要文字 | `#bbb` | ~7:1 |
+| 辅助/提示 | `#999` | ~4.8:1 |
+| 禁用/占位 | `#777` | ~3.5:1 |
+
+### 弹窗层级系统 (ModalManager) 🏗️
+
+#### 新增 ModalManager 模块
+- **7级弹窗层级**：浮窗(0) < Toast(1) < 详情(2) < 设置(3) < 确认/白名单(4) < 单词(5) < 强拦截(6)
+- **z-index 统一管理**：基数 `1000000` + 层级偏移
+- **同级互斥**：同级别弹窗只保留最新的
+- **API**：`register(id, level, element)` / `dismiss(id)` / `dismissAllIntervention()` / `hasInterventionModal()` / `isActive(id)` / `getTopModal()`
+- **v1.3.0 预留**：Toast(1) 和 强拦截(6) 层级已定义，后续直接使用
+
+#### 现有弹窗迁移
+| 弹窗 | 注册 ID | 层级 |
+|------|---------|------|
+| 详情面板 | `detail-modal` | 2 |
+| 设置面板 | `settings-modal` | 3 |
+| 确认弹窗 | `confirm-modal` | 4 |
+| 添加白名单弹窗 | `whitelist-modal` | 4 |
+| 单词验证弹窗 | `word-modal` | 5 |
+
+- `closeCurrentModal()` → `ModalManager.dismiss()`
+- `DetailPanel.close()` → `ModalManager.dismiss('detail-modal')`
+- `closeSettings()` → `ModalManager.dismiss('settings-modal')`
+- 白名单弹窗关闭 → `ModalManager.dismiss('whitelist-modal')`
+
+---
+
 ## [1.2.4.1] - 2026-04-20
 
 ### 视觉优化 🎨（补丁版本）

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.4.1
+// @version      1.2.5
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -819,6 +819,150 @@ const STYLES = `
         border-color: #3b82f6;
     }
 
+    /* v1.2.5: 详情面板通用组件 class */
+    .bilibili-study-module-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        gap: 6px;
+    }
+    .bilibili-study-module-header .bilibili-study-module-title {
+        margin-bottom: 0;
+    }
+    .bilibili-study-module-actions {
+        display: flex;
+        gap: 6px;
+    }
+    .bilibili-study-btn-sm {
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 6px;
+    }
+    .bilibili-study-btn-sm.bilibili-study-btn-primary {
+        background: rgba(59,130,246,0.15);
+        border: 1px solid rgba(59,130,246,0.3);
+        color: #60a5fa;
+    }
+    .bilibili-study-btn-sm.bilibili-study-btn-secondary {
+        background: transparent;
+        border: 1px solid #ddd;
+        color: #666;
+    }
+    .bilibili-study-btn-sm.bilibili-study-btn-secondary:hover {
+        border-color: #999;
+        color: #333;
+    }
+
+    /* v1.2.5: 词库警告区 class（替代内联样式） */
+    .bilibili-study-vocab-warning {
+        margin: 10px 0;
+        padding: 10px;
+        background: #fff3e0;
+        border-radius: 6px;
+        border: 1px solid #ffe0b2;
+    }
+    .bilibili-study-vocab-warning-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .bilibili-study-vocab-warning-icon {
+        font-size: 16px;
+    }
+    .bilibili-study-vocab-warning-title {
+        color: #e65100;
+        font-weight: bold;
+    }
+    .bilibili-study-vocab-warning-text {
+        margin: 5px 0 0 0;
+        color: #bf360c;
+        font-size: 13px;
+    }
+    .bilibili-study-vocab-critical {
+        margin: 10px 0;
+        padding: 10px;
+        background: #ffebee;
+        border-radius: 6px;
+        border: 1px solid #ffcdd2;
+    }
+    .bilibili-study-vocab-critical-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .bilibili-study-vocab-critical-icon {
+        font-size: 16px;
+    }
+    .bilibili-study-vocab-critical-title {
+        color: #c62828;
+        font-weight: bold;
+    }
+    .bilibili-study-vocab-critical-text {
+        margin: 5px 0 0 0;
+        color: #b71c1c;
+        font-size: 13px;
+    }
+
+    /* v1.2.5: 锁定面板 class */
+    .bilibili-study-locked-panel {
+        text-align: center;
+        padding: 20px;
+        opacity: 0.7;
+    }
+    .bilibili-study-locked-icon {
+        font-size: 32px;
+        margin-bottom: 8px;
+    }
+    .bilibili-study-locked-text {
+        margin: 0;
+        font-size: 13px;
+        color: inherit;
+    }
+
+    /* v1.2.5: 历史视频项 class */
+    .bilibili-study-history-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(128,128,128,0.15);
+    }
+    .bilibili-study-history-link {
+        flex: 1;
+        text-decoration: none;
+        color: inherit;
+        min-width: 0;
+    }
+    .bilibili-study-history-title {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .bilibili-study-history-meta {
+        font-size: 11px;
+        color: #888;
+        margin-top: 2px;
+    }
+    .bilibili-study-history-meta-extra {
+        margin-left: 8px;
+    }
+    .bilibili-study-history-right {
+        flex-shrink: 0;
+        text-align: right;
+    }
+    .bilibili-study-history-time {
+        font-size: 11px;
+        color: #888;
+    }
+    .bilibili-study-history-reason {
+        font-size: 10px;
+        color: #aaa;
+    }
+
     /* v1.2.4: 干预设置 radio 选项组 */
     .bilibili-study-settings-option-group {
         display: flex;
@@ -1160,6 +1304,52 @@ const STYLES = `
         background: #3d1a1a !important;
         color: #f87171 !important;
         border-color: #5a2d2d !important;
+    }
+
+    /* v1.2.5: 详情面板通用组件暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-btn-sm.bilibili-study-btn-secondary {
+        border-color: #555 !important;
+        color: #bbb !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-btn-sm.bilibili-study-btn-secondary:hover {
+        border-color: #888 !important;
+        color: #eee !important;
+    }
+
+    /* v1.2.5: 词库警告区暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning {
+        background: rgba(255, 152, 0, 0.12) !important;
+        border-color: rgba(255, 152, 0, 0.25) !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning-title {
+        color: #ffab40 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-vocab-warning-text {
+        color: #ff8a65 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical {
+        background: rgba(239, 83, 80, 0.12) !important;
+        border-color: rgba(239, 83, 80, 0.25) !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical-title {
+        color: #ef5350 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-vocab-critical-text {
+        color: #e57373 !important;
+    }
+
+    /* v1.2.5: 历史视频暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-history-item {
+        border-bottom-color: rgba(255,255,255,0.08) !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-history-meta {
+        color: #999 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-history-time {
+        color: #999 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-history-reason {
+        color: #777 !important;
     }
 `;
 
@@ -2811,23 +3001,23 @@ const DetailPanel = (function() {
         let vocabWarning = '';
         if (unmasteredCount < 50 && unmasteredCount > 0) {
             vocabWarning = `
-                <div class="bilibili-study-vocab-warning" style="margin: 10px 0; padding: 10px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 16px;">⚠️</span>
-                        <span class="bilibili-study-vocab-warning-title" style="color: #e65100; font-weight: bold;">词库不足提醒</span>
+                <div class="bilibili-study-vocab-warning">
+                    <div class="bilibili-study-vocab-warning-header">
+                        <span class="bilibili-study-vocab-warning-icon">⚠️</span>
+                        <span class="bilibili-study-vocab-warning-title">词库不足提醒</span>
                     </div>
-                    <p class="bilibili-study-vocab-warning-text" style="margin: 5px 0 0 0; color: #bf360c; font-size: 13px;">
+                    <p class="bilibili-study-vocab-warning-text">
                         可学习单词仅剩 <strong>${unmasteredCount}</strong> 个，建议添加更多词汇以保持学习效果。
                     </p>
                 </div>`;
         } else if (unmasteredCount === 0) {
             vocabWarning = `
-                <div class="bilibili-study-vocab-critical" style="margin: 10px 0; padding: 10px; background: #ffebee; border-radius: 6px; border: 1px solid #ffcdd2;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 16px;">🔴</span>
-                        <span class="bilibili-study-vocab-critical-title" style="color: #c62828; font-weight: bold;">词库已全部掌握</span>
+                <div class="bilibili-study-vocab-critical">
+                    <div class="bilibili-study-vocab-critical-header">
+                        <span class="bilibili-study-vocab-critical-icon">🔴</span>
+                        <span class="bilibili-study-vocab-critical-title">词库已全部掌握</span>
                     </div>
-                    <p class="bilibili-study-vocab-critical-text" style="margin: 5px 0 0 0; color: #b71c1c; font-size: 13px;">
+                    <p class="bilibili-study-vocab-critical-text">
                         所有单词已掌握，请添加新词汇继续学习！
                     </p>
                 </div>`;
@@ -2847,18 +3037,16 @@ const DetailPanel = (function() {
 
         return `
             <div class="bilibili-study-modal-module" id="bilibili-study-module3-wrapper">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px;">
-                    <h3 class="bilibili-study-module-title" style="margin-bottom: 0;">📚 单词学习</h3>
-                    <div style="display: flex; gap: 6px;">
+                <div class="bilibili-study-module-header">
+                    <h3 class="bilibili-study-module-title">📚 单词学习</h3>
+                    <div class="bilibili-study-module-actions">
                         <button id="bilibili-study-refresh-vocab"
-                                class="bilibili-study-btn"
-                                style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa;"
+                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-primary"
                                 title="刷新词库信息，查看最新学习状态（不清除记录）">
                             🔄 刷新词库
                         </button>
                         <button id="bilibili-study-reset-vocab"
-                                class="bilibili-study-btn bilibili-study-btn-secondary"
-                                style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px;"
+                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-secondary"
                                 title="重置所有单词的掌握状态和答题记录，从零开始学习">
                             🗑️ 重置记录
                         </button>
@@ -3012,9 +3200,9 @@ const DetailPanel = (function() {
                 <div class="bilibili-study-modal-module" id="bilibili-study-module6-wrapper">
                     <h3 class="bilibili-study-module-title">📼 历史视频</h3>
                     <div class="bilibili-study-module-content">
-                        <div class="bilibili-study-locked-panel" style="text-align: center; padding: 20px; opacity: 0.6;">
-                            <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
-                            <p style="margin: 0; font-size: 13px; color: inherit;">学习时段内不可查看，休息后再来回顾吧</p>
+                        <div class="bilibili-study-locked-panel">
+                            <div class="bilibili-study-locked-icon">🔒</div>
+                            <p class="bilibili-study-locked-text">学习时段内不可查看，休息后再来回顾吧</p>
                         </div>
                     </div>
                 </div>
@@ -3053,20 +3241,19 @@ const DetailPanel = (function() {
             const shortTitle = v.title.length > 28 ? v.title.slice(0, 28) + '…' : v.title;
 
             return `
-                <div class="bilibili-study-history-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,0.15);">
+                <div class="bilibili-study-history-item">
                     <a href="https://www.bilibili.com/video/${v.bv}" target="_blank"
                        class="bilibili-study-history-link"
-                       style="flex: 1; text-decoration: none; color: inherit; min-width: 0;"
                        title="${v.title}">
-                        <div style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${shortTitle}</div>
-                        <div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">
+                        <div class="bilibili-study-history-title">${shortTitle}</div>
+                        <div class="bilibili-study-history-meta">
                             <span>${v.bv}</span>
-                            ${durationStr ? `<span style="margin-left: 8px;">⏱${durationStr}</span>` : ''}
+                            ${durationStr ? `<span class="bilibili-study-history-meta-extra">⏱${durationStr}</span>` : ''}
                         </div>
                     </a>
-                    <div style="flex-shrink: 0; text-align: right;">
-                        <div style="font-size: 11px; opacity: 0.5;">${timeStr}</div>
-                        <div style="font-size: 10px; opacity: 0.4;">${reasonLabel}</div>
+                    <div class="bilibili-study-history-right">
+                        <div class="bilibili-study-history-time">${timeStr}</div>
+                        <div class="bilibili-study-history-reason">${reasonLabel}</div>
                     </div>
                 </div>
             `;
@@ -3074,11 +3261,10 @@ const DetailPanel = (function() {
 
         return `
             <div class="bilibili-study-modal-module" id="bilibili-study-module6-wrapper">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <h3 class="bilibili-study-module-title" style="margin-bottom: 0;">📼 历史视频</h3>
+                <div class="bilibili-study-module-header">
+                    <h3 class="bilibili-study-module-title">📼 历史视频</h3>
                     <button id="bilibili-study-clear-history"
-                            class="bilibili-study-btn bilibili-study-btn-secondary"
-                            style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px;"
+                            class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-secondary"
                             title="清空历史视频记录">
                         🗑️ 清空
                     </button>
@@ -3093,7 +3279,8 @@ const DetailPanel = (function() {
     // Close modal
     function close() {
         if (modalElement) {
-            modalElement.remove();
+            // v1.2.5: 从 ModalManager 注销
+            ModalManager.dismiss('detail-modal');
             modalElement = null;
         }
         isOpen = false;
@@ -3156,7 +3343,10 @@ const DetailPanel = (function() {
 
         document.body.appendChild(modalElement);
         isOpen = true;
-        
+
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('detail-modal', ModalManager.LEVELS.DETAIL, modalElement);
+
         // Apply saved theme
         applyTheme(currentTheme);
 
@@ -3314,12 +3504,15 @@ const DetailPanel = (function() {
 
         document.body.appendChild(modal);
 
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('whitelist-modal', ModalManager.LEVELS.CONFIRM, modal);
+
         document.getElementById('bilibili-study-whitelist-confirm').addEventListener('click', function() {
             const courseName = document.getElementById('bilibili-study-whitelist-course-name').value.trim();
             const result = ConfigManager.addToWhitelist(currentBV, courseName);
 
             if (result.success) {
-                modal.remove();
+                ModalManager.dismiss('whitelist-modal');
                 close();
             } else {
                 const errorDiv = document.getElementById('bilibili-study-whitelist-error');
@@ -3329,18 +3522,18 @@ const DetailPanel = (function() {
         });
 
         document.getElementById('bilibili-study-whitelist-cancel').addEventListener('click', function() {
-            modal.remove();
+            ModalManager.dismiss('whitelist-modal');
         });
 
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
-                modal.remove();
+                ModalManager.dismiss('whitelist-modal');
             }
         });
 
         modal.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                modal.remove();
+                ModalManager.dismiss('whitelist-modal');
             }
         });
     }
@@ -3387,12 +3580,17 @@ const DetailPanel = (function() {
         `;
 
         document.body.appendChild(settingsElement);
+
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('settings-modal', ModalManager.LEVELS.SETTINGS, settingsElement);
+
         bindSettingsEvents();
     }
 
     function closeSettings() {
         if (settingsElement) {
-            settingsElement.remove();
+            // v1.2.5: 从 ModalManager 注销
+            ModalManager.dismiss('settings-modal');
             settingsElement = null;
         }
     }
@@ -4326,6 +4524,147 @@ const StatisticsTracker = (function() {
 })();
 
 // ==========================================
+// ModalManager Module (v1.2.5)
+// 统一管理弹窗层级、互斥、z-index
+// ==========================================
+const ModalManager = (function() {
+    // 弹窗层级定义（从低到高）
+    const LEVELS = {
+        FLOATING:   0,  // 浮窗
+        TOAST:      1,  // Toast 提醒（v1.3.0 预留）
+        DETAIL:     2,  // 详情面板
+        SETTINGS:   3,  // 设置面板
+        CONFIRM:    4,  // 确认弹窗 / 添加白名单弹窗
+        WORD:       5,  // 单词验证弹窗
+        AGGRESSIVE: 6   // 强拦截全屏遮罩（v1.3.0 预留）
+    };
+
+    // z-index 基数
+    const Z_BASE = 1000000;
+
+    // 当前激活的弹窗栈
+    let activeModals = [];  // [{ id, level, element }]
+
+    /**
+     * 获取弹窗的 z-index
+     * @param {number} level - 弹窗层级
+     * @returns {number} z-index 值
+     */
+    function getZIndex(level) {
+        return Z_BASE + level;
+    }
+
+    /**
+     * 注册弹窗
+     * - 同级互斥：自动关闭已有的同级弹窗
+     * - 自动设置 z-index
+     * @param {string} id - 弹窗唯一标识
+     * @param {number} level - 弹窗层级（LEVELS 中的值）
+     * @param {HTMLElement} element - 弹窗 DOM 元素
+     */
+    function register(id, level, element) {
+        if (!element) return;
+
+        // 同级互斥：关闭已有的同级弹窗
+        const existing = activeModals.find(m => m.level === level);
+        if (existing) {
+            dismiss(existing.id);
+        }
+
+        // 如果该 id 已注册，先移除旧记录
+        const existingById = activeModals.find(m => m.id === id);
+        if (existingById) {
+            activeModals = activeModals.filter(m => m.id !== id);
+        }
+
+        // 设置 z-index
+        element.style.zIndex = getZIndex(level);
+
+        activeModals.push({ id, level, element });
+
+        console.log(`[B站学习助手] ModalManager: 注册弹窗 "${id}" (level=${level}, z-index=${getZIndex(level)})`);
+    }
+
+    /**
+     * 关闭弹窗
+     * @param {string} id - 弹窗唯一标识
+     */
+    function dismiss(id) {
+        const index = activeModals.findIndex(m => m.id === id);
+        if (index !== -1) {
+            const modal = activeModals[index];
+            if (modal.element && modal.element.parentNode) {
+                modal.element.remove();
+            }
+            activeModals.splice(index, 1);
+            console.log(`[B站学习助手] ModalManager: 关闭弹窗 "${id}"`);
+        }
+    }
+
+    /**
+     * 关闭所有干预弹窗（保留用户主动打开的详情面板和设置面板）
+     */
+    function dismissAllIntervention() {
+        activeModals = activeModals.filter(m => {
+            if (m.level >= LEVELS.CONFIRM) {
+                if (m.element && m.element.parentNode) {
+                    m.element.remove();
+                }
+                return false;
+            }
+            return true;
+        });
+    }
+
+    /**
+     * 获取当前最高优先级弹窗
+     * @returns {object|null} 最高优先级弹窗信息
+     */
+    function getTopModal() {
+        if (activeModals.length === 0) return null;
+        return activeModals.reduce((a, b) => a.level > b.level ? a : b);
+    }
+
+    /**
+     * 检查是否有干预弹窗激活
+     * @returns {boolean}
+     */
+    function hasInterventionModal() {
+        return activeModals.some(m => m.level >= LEVELS.CONFIRM);
+    }
+
+    /**
+     * 检查指定弹窗是否激活
+     * @param {string} id - 弹窗唯一标识
+     * @returns {boolean}
+     */
+    function isActive(id) {
+        return activeModals.some(m => m.id === id);
+    }
+
+    /**
+     * 获取所有激活的弹窗
+     * @returns {Array}
+     */
+    function getActiveModals() {
+        return [...activeModals];
+    }
+
+    return {
+        LEVELS,
+        Z_BASE,
+        register,
+        dismiss,
+        dismissAllIntervention,
+        getTopModal,
+        hasInterventionModal,
+        isActive,
+        getActiveModals,
+        getZIndex
+    };
+})();
+
+// ==========================================
 // InterventionController Module
 // ==========================================
 const InterventionController = (function() {
@@ -4583,11 +4922,9 @@ const InterventionController = (function() {
     }
 
     function closeCurrentModal() {
-        const confirmModal = document.getElementById('bilibili-study-confirm-modal');
-        const wordModal = document.getElementById('bilibili-study-word-modal');
-
-        if (confirmModal) confirmModal.remove();
-        if (wordModal) wordModal.remove();
+        // v1.2.5: 通过 ModalManager 关闭所有干预弹窗
+        ModalManager.dismiss('confirm-modal');
+        ModalManager.dismiss('word-modal');
 
         modalState = MODAL_STATES.NONE;
     }
@@ -4678,6 +5015,9 @@ const InterventionController = (function() {
 
         getModalContainer().appendChild(modal);
         applyCurrentThemeToModal(modal);
+
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('confirm-modal', ModalManager.LEVELS.CONFIRM, modal);
 
         // 课程列表点击事件 - 使用事件委托，避免内联onclick的嵌套模板字符串问题
         if (hasWhitelist) {
@@ -4794,6 +5134,9 @@ const InterventionController = (function() {
 
         getModalContainer().appendChild(modal);
         applyCurrentThemeToModal(modal);
+
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('word-modal', ModalManager.LEVELS.WORD, modal);
 
         const input = document.getElementById('bilibili-study-word-input');
         const submitBtn = document.getElementById('bilibili-study-word-submit');
