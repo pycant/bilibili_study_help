@@ -794,6 +794,31 @@ const STYLES = `
         letter-spacing: 0.3px;
     }
 
+    /* v1.2.4.1: 重置策略参数行 */
+    .bilibili-study-reset-param-row {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .bilibili-study-reset-label {
+        font-size: 13px;
+        white-space: nowrap;
+        color: #555;
+    }
+    .bilibili-study-reset-input {
+        width: 60px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        text-align: center;
+        font-size: 14px;
+        outline: none;
+    }
+    .bilibili-study-reset-input:focus {
+        border-color: #3b82f6;
+    }
+
     /* v1.2.4: 干预设置 radio 选项组 */
     .bilibili-study-settings-option-group {
         display: flex;
@@ -1104,6 +1129,19 @@ const STYLES = `
     }
     .bilibili-study-dark-mode .bilibili-study-stage-timeline-item {
         color: #999 !important;
+    }
+
+    /* v1.2.4.1: 重置策略参数行暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-reset-label {
+        color: #bbb !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-reset-input {
+        background: #2d2d2d !important;
+        color: #e0e0e0 !important;
+        border-color: #555 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-reset-input:focus {
+        border-color: #60a5fa !important;
     }
         color: #e0e0e0 !important;
     }
@@ -3546,17 +3584,17 @@ const DetailPanel = (function() {
                         <span>📐 固定间隔</span>
                     </label>
                 </div>
-                <div id="bilibili-study-reset-duration-row" style="margin-top: 8px; display: ${resetStrategy === 'duration' ? 'flex' : 'none'}; align-items: center; gap: 8px;">
-                    <label style="font-size: 13px; white-space: nowrap;">累计学习</label>
+                <div id="bilibili-study-reset-duration-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'duration' ? 'flex' : 'none'};">
+                    <label class="bilibili-study-reset-label">累计学习</label>
                     <input type="number" id="bilibili-study-reset-duration" value="${resetDuration}" min="5" max="120"
-                           style="width: 60px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; text-align: center;">
-                    <span style="font-size: 13px;">分钟后重置</span>
+                           class="bilibili-study-reset-input">
+                    <span class="bilibili-study-reset-label">分钟后重置</span>
                 </div>
-                <div id="bilibili-study-reset-interval-row" style="margin-top: 8px; display: ${resetStrategy === 'interval' ? 'flex' : 'none'}; align-items: center; gap: 8px;">
-                    <label style="font-size: 13px; white-space: nowrap;">离开超过</label>
+                <div id="bilibili-study-reset-interval-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'interval' ? 'flex' : 'none'};">
+                    <label class="bilibili-study-reset-label">离开超过</label>
                     <input type="number" id="bilibili-study-reset-interval" value="${resetInterval}" min="5" max="120"
-                           style="width: 60px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; text-align: center;">
-                    <span style="font-size: 13px;">分钟后重置</span>
+                           class="bilibili-study-reset-input">
+                    <span class="bilibili-study-reset-label">分钟后重置</span>
                 </div>
             </div>
         `;
