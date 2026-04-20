@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.4
+// @version      1.2.4.1
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -770,6 +770,30 @@ const STYLES = `
         margin: 0 0 8px 0;
     }
 
+    /* v1.2.4.1: 阶段时间表样式 */
+    .bilibili-study-stage-timeline {
+        margin-top: 10px;
+        padding: 12px 14px;
+        background: rgba(128, 128, 128, 0.08);
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.6;
+        border: 1px solid rgba(128, 128, 128, 0.12);
+    }
+    .bilibili-study-stage-timeline .stage-timeline-title {
+        margin: 0 0 6px 0;
+        font-weight: bold;
+        color: #555;
+        font-size: 13px;
+    }
+    .bilibili-study-stage-timeline-item {
+        padding: 2px 0;
+        color: #666;
+        font-family: "SF Mono", "Consolas", "Menlo", monospace;
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
+
     /* v1.2.4: 干预设置 radio 选项组 */
     .bilibili-study-settings-option-group {
         display: flex;
@@ -1022,17 +1046,18 @@ const STYLES = `
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-radio {
-        background: #2a2a2a !important;
-        border-color: #444 !important;
-        color: #e0e0e0 !important;
+        background: #2d2d2d !important;
+        border-color: #555 !important;
+        color: #ddd !important;
     }
     .bilibili-study-dark-mode .bilibili-study-settings-radio:hover {
         border-color: #60a5fa !important;
-        background: rgba(59,130,246,0.1) !important;
+        background: rgba(59,130,246,0.12) !important;
     }
     .bilibili-study-dark-mode .bilibili-study-settings-radio:has(input:checked) {
         border-color: #3b82f6 !important;
-        background: rgba(59,130,246,0.15) !important;
+        background: rgba(59,130,246,0.18) !important;
+        color: #fff !important;
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-row textarea {
@@ -1042,7 +1067,7 @@ const STYLES = `
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-hint {
-        color: #666 !important;
+        color: #999 !important;
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-error {
@@ -1050,7 +1075,7 @@ const STYLES = `
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-empty-hint {
-        color: #888 !important;
+        color: #aaa !important;
     }
 
     .bilibili-study-dark-mode .bilibili-study-vocab-error-count {
@@ -1066,6 +1091,20 @@ const STYLES = `
     }
 
     .bilibili-study-dark-mode .bilibili-study-settings-whitelist-name {
+        color: #e0e0e0 !important;
+    }
+
+    /* v1.2.4.1: 阶段时间表暗色模式 */
+    .bilibili-study-dark-mode .bilibili-study-stage-timeline {
+        background: rgba(255, 255, 255, 0.04) !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-stage-timeline .stage-timeline-title {
+        color: #ccc !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-stage-timeline-item {
+        color: #999 !important;
+    }
         color: #e0e0e0 !important;
     }
 
@@ -3460,9 +3499,9 @@ const DetailPanel = (function() {
                     </label>
                 </div>
                 <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${levelDescriptions[level] || ''}</p>
-                <div style="margin-top: 10px; padding: 10px; background: rgba(128,128,128,0.08); border-radius: 6px; font-size: 12px;">
-                    <p style="margin: 0 0 4px 0; font-weight: bold;">阶段时间表：</p>
-                    ${timeline.map((t, i) => `<div style="padding: 2px 0; opacity: 0.7;">阶段${i + 1}: ${t}</div>`).join('')}
+                <div class="bilibili-study-stage-timeline">
+                    <p class="stage-timeline-title">阶段时间表：</p>
+                    ${timeline.map((t, i) => `<div class="bilibili-study-stage-timeline-item">阶段${i + 1}: ${t}</div>`).join('')}
                 </div>
             </div>
 
