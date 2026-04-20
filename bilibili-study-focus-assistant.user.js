@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.2
+// @version      1.2.4
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -770,6 +770,37 @@ const STYLES = `
         margin: 0 0 8px 0;
     }
 
+    /* v1.2.4: 干预设置 radio 选项组 */
+    .bilibili-study-settings-option-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .bilibili-study-settings-radio {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        background: #fafafa;
+        font-size: 13px;
+        transition: all 0.2s ease;
+    }
+    .bilibili-study-settings-radio:hover {
+        border-color: #60a5fa;
+        background: rgba(59,130,246,0.05);
+    }
+    .bilibili-study-settings-radio input[type="radio"] {
+        margin: 0;
+        accent-color: #3b82f6;
+    }
+    .bilibili-study-settings-radio:has(input:checked) {
+        border-color: #3b82f6;
+        background: rgba(59,130,246,0.1);
+    }
+
     .bilibili-study-settings-row {
         display: flex;
         align-items: center;
@@ -990,6 +1021,20 @@ const STYLES = `
         border-color: #444 !important;
     }
 
+    .bilibili-study-dark-mode .bilibili-study-settings-radio {
+        background: #2a2a2a !important;
+        border-color: #444 !important;
+        color: #e0e0e0 !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-settings-radio:hover {
+        border-color: #60a5fa !important;
+        background: rgba(59,130,246,0.1) !important;
+    }
+    .bilibili-study-dark-mode .bilibili-study-settings-radio:has(input:checked) {
+        border-color: #3b82f6 !important;
+        background: rgba(59,130,246,0.15) !important;
+    }
+
     .bilibili-study-dark-mode .bilibili-study-settings-row textarea {
         background: #2a2a2a !important;
         color: #e0e0e0 !important;
@@ -1200,7 +1245,28 @@ const USER_CONFIG = {
     },
 
     // Statistics period
-    statsPeriod: "day"  // "day" or "week"
+    statsPeriod: "day",  // "day" or "week"
+
+    // 干预重置策略（v1.2.3 新增）
+    // 'period'   - 跟随学习时段配置，每个时段结束时重置（默认）
+    // 'duration' - 累计学习满X分钟后重置
+    // 'interval' - 距上次活动超过X分钟后重置
+    resetStrategy: 'period',
+    resetDuration: 30,   // 固定学习时长（分钟），策略=duration时生效
+    resetInterval: 30,   // 固定间隔（分钟），策略=interval时生效
+
+    // 干预等级（v1.2.4 新增）
+    // 'gentle'  - 温和：stage1=3min, stage2=10min, stage3=20min, stage4=40min
+    // 'standard'- 标准：stage1=1min, stage2=3min,  stage3=10min, stage4=20min（默认）
+    // 'strict'  - 严格：stage1=30s, stage2=1min,  stage3=3min,  stage4=10min
+    interventionLevel: 'standard',
+
+    // 视觉效果强度（v1.2.4 新增）
+    // 'none'    - 无视觉效果
+    // 'light'   - 轻度：grayscale最高40%, opacity最低0.85
+    // 'medium'  - 中度：grayscale最高60%, opacity最低0.75
+    // 'heavy'   - 重度：grayscale最高80%, opacity最低0.6（默认，等同当前效果）
+    visualEffectLevel: 'heavy'
 };
 
 // ==========================================
@@ -1233,7 +1299,14 @@ const ConfigManager = (function() {
                     floatingWindow: {
                         ...USER_CONFIG.floatingWindow,
                         ...(parsed.floatingWindow || {})
-                    }
+                    },
+                    // 干预重置策略（v1.2.3 新增）：确保新字段有默认值
+                    resetStrategy: parsed.resetStrategy || USER_CONFIG.resetStrategy,
+                    resetDuration: parsed.resetDuration || USER_CONFIG.resetDuration,
+                    resetInterval: parsed.resetInterval || USER_CONFIG.resetInterval,
+                    // 干预等级 & 视觉效果强度（v1.2.4 新增）
+                    interventionLevel: parsed.interventionLevel || USER_CONFIG.interventionLevel,
+                    visualEffectLevel: parsed.visualEffectLevel || USER_CONFIG.visualEffectLevel,
                 };
             } else {
                 currentConfig = { ...USER_CONFIG };
@@ -1331,6 +1404,57 @@ const ConfigManager = (function() {
         return !!config.whitelist[bv];
     }
 
+    // Check if current time is in a rest period (between study periods, v1.2.3 新增)
+    // 休息时段 = 在两个学习时段之间的间隙，且不是学习时段
+    function isRestPeriod() {
+        const config = get();
+        if (!config.studyPeriods || config.studyPeriods.length < 2) {
+            return false;  // 少于2个时段不存在"间隙"
+        }
+        // 当前是学习时段 → 不是休息时段
+        if (isStudyTime()) {
+            return false;
+        }
+        // 当前不是学习时段，但今天还有未来的学习时段 → 是休息时段
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        for (const period of config.studyPeriods) {
+            const startMinutes = parseTimeToMinutes(period[0]);
+            // 如果有还没开始的学习时段，说明当前在休息时段
+            if (currentMinutes < startMinutes) {
+                return true;
+            }
+        }
+        // 今天所有学习时段都已结束
+        return false;
+    }
+
+    // Get the end time of current study period (v1.2.3 新增)
+    // 返回当前学习时段的结束时间（分钟），不在学习时段时返回 null
+    function getCurrentPeriodEnd() {
+        const config = get();
+        if (!config.studyPeriods || config.studyPeriods.length === 0) {
+            return null;
+        }
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        for (const period of config.studyPeriods) {
+            const startMinutes = parseTimeToMinutes(period[0]);
+            const endMinutes = parseTimeToMinutes(period[1]);
+            if (startMinutes <= endMinutes) {
+                if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+                    return endMinutes;
+                }
+            } else {
+                // Overnight period
+                if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
+                    return endMinutes;
+                }
+            }
+        }
+        return null;
+    }
+
     // Add video to whitelist with optional course name
     function addToWhitelist(bv, courseName) {
         const config = get();
@@ -1426,10 +1550,61 @@ const ConfigManager = (function() {
     // Get intervention config for stage
     function getInterventionConfig(stage) {
         const config = get();
-        if (!config.interventionStages || stage < 0 || stage >= config.interventionStages.length) {
+        const stages = getEffectiveInterventionStages();
+        if (!stages || stage < 0 || stage >= stages.length) {
             return null;
         }
-        return config.interventionStages[stage];
+        return stages[stage];
+    }
+
+    // v1.2.4: 根据 interventionLevel 获取实际生效的干预阶段配置
+    // 如果用户自定义过 interventionStages 则优先用自定义的
+    function getEffectiveInterventionStages() {
+        const config = get();
+        // 如果 localStorage 中存了自定义的 interventionStages，优先使用
+        if (config.interventionStages && config._customStages) {
+            return config.interventionStages;
+        }
+
+        const level = config.interventionLevel || 'standard';
+        const LEVEL_STAGES = {
+            gentle: [
+                { threshold: 0, interval: 0 },
+                { threshold: 180, interval: 0 },     // 3min
+                { threshold: 600, interval: 120 },    // 10min, popup 2min
+                { threshold: 1200, interval: 60 },    // 20min, popup 1min
+                { threshold: 2400, interval: 30 }     // 40min, popup 30s
+            ],
+            standard: [
+                { threshold: 0, interval: 0 },
+                { threshold: 60, interval: 0 },       // 1min
+                { threshold: 180, interval: 60 },     // 3min, popup 1min
+                { threshold: 600, interval: 30 },     // 10min, popup 30s
+                { threshold: 1200, interval: 15 }     // 20min, popup 15s
+            ],
+            strict: [
+                { threshold: 0, interval: 0 },
+                { threshold: 30, interval: 0 },       // 30s
+                { threshold: 60, interval: 30 },      // 1min, popup 30s
+                { threshold: 180, interval: 15 },     // 3min, popup 15s
+                { threshold: 600, interval: 10 }      // 10min, popup 10s
+            ]
+        };
+        return LEVEL_STAGES[level] || LEVEL_STAGES.standard;
+    }
+
+    // v1.2.4: 根据 visualEffectLevel 获取视觉效果参数
+    // 返回 { maxInvert, maxGrayscale, minOpacity }
+    function getVisualEffectParams() {
+        const config = get();
+        const level = config.visualEffectLevel || 'heavy';
+        const LEVEL_PARAMS = {
+            none:   { maxInvert: 0,   maxGrayscale: 0,   minOpacity: 1 },
+            light:  { maxInvert: 40,  maxGrayscale: 40,  minOpacity: 0.85 },
+            medium: { maxInvert: 70,  maxGrayscale: 60,  minOpacity: 0.75 },
+            heavy:  { maxInvert: 100, maxGrayscale: 80,  minOpacity: 0.6 }
+        };
+        return LEVEL_PARAMS[level] || LEVEL_PARAMS.heavy;
     }
 
     return {
@@ -1437,8 +1612,12 @@ const ConfigManager = (function() {
         save,
         get,
         isStudyTime,
+        isRestPeriod,
+        getCurrentPeriodEnd,
         isWhitelisted,
         getInterventionConfig,
+        getEffectiveInterventionStages,
+        getVisualEffectParams,
         addToWhitelist,
         removeFromWhitelist,
         getWhitelistArray,
@@ -1448,7 +1627,294 @@ const ConfigManager = (function() {
 })();
 
 // ==========================================
-// StorageManager Module
+// GlobalStateManager Module (v1.2.3 新增)
+// ==========================================
+// 将干预状态从 window 内存变量迁移到 localStorage，实现跨窗口持久化
+// 支持三种重置策略：时段配置(period) / 固定学习时长(duration) / 固定间隔(interval)
+const GlobalStateManager = (function() {
+    const STATE_KEY = 'bilibiliStudy_globalState';
+
+    // 默认全局状态
+    const DEFAULT_STATE = {
+        currentStage: 0,
+        distractionStartTime: null,
+        isStudying: true,
+        lastStudyPeriodEnd: null,      // 上次学习时段结束时间戳
+        lastActivityTime: null,        // 上次活动时间戳（interval策略用）
+        accumulatedStudyTime: 0,       // 累计学习时间秒数（duration策略用）
+    };
+
+    // 上一 tick 的 isStudyTime 状态，用于检测下降沿
+    let _wasStudyTime = null;
+
+    // 读取全局状态
+    function load() {
+        try {
+            const stored = localStorage.getItem(STATE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                return { ...DEFAULT_STATE, ...parsed };
+            }
+        } catch (e) {
+            console.warn('[B站学习助手] GlobalStateManager.load: 读取失败，使用默认值', e);
+        }
+        return { ...DEFAULT_STATE };
+    }
+
+    // 写入全局状态
+    function save(state) {
+        try {
+            localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.warn('[B站学习助手] GlobalStateManager.save: 写入失败', e);
+        }
+    }
+
+    // 获取某个字段
+    function get(key) {
+        const state = load();
+        return key ? state[key] : state;
+    }
+
+    // 设置某个字段
+    function set(key, value) {
+        const state = load();
+        state[key] = value;
+        save(state);
+        return state;
+    }
+
+    // 批量更新
+    function update(partial) {
+        const state = load();
+        const newState = { ...state, ...partial };
+        save(newState);
+        return newState;
+    }
+
+    // 重置干预状态
+    function resetIntervention() {
+        const state = load();
+        state.currentStage = 0;
+        state.distractionStartTime = null;
+        state.isStudying = true;
+        state.lastStudyPeriodEnd = Date.now();
+        state.accumulatedStudyTime = 0;
+        save(state);
+        console.log('[B站学习助手] GlobalStateManager.resetIntervention: 干预状态已重置');
+        return state;
+    }
+
+    // 根据重置策略检查是否需要重置（每个 tick 调用）
+    // isStudyTimeNow: 当前是否在学习时段
+    function checkAndReset(isStudyTimeNow) {
+        const config = ConfigManager.get();
+        const strategy = config.resetStrategy || 'period';
+        const state = load();
+        let needReset = false;
+
+        switch (strategy) {
+            case 'period': {
+                // 策略1：学习时段结束时重置（检测 isStudyTime 下降沿）
+                if (_wasStudyTime === true && !isStudyTimeNow) {
+                    // 从学习时段 → 非学习时段 = 时段结束
+                    // 但要排除"休息时段"：休息时段不重置，等下一个学习时段开始时再判断
+                    if (!ConfigManager.isRestPeriod()) {
+                        needReset = true;
+                        console.log('[B站学习助手] period策略: 学习时段结束，触发重置');
+                    }
+                }
+                break;
+            }
+            case 'duration': {
+                // 策略2：累计学习满X分钟后重置
+                const threshold = (config.resetDuration || 30) * 60;
+                if (state.accumulatedStudyTime >= threshold) {
+                    needReset = true;
+                    console.log('[B站学习助手] duration策略: 累计学习', state.accumulatedStudyTime, '秒 ≥', threshold, '秒，触发重置');
+                }
+                break;
+            }
+            case 'interval': {
+                // 策略3：距上次活动超过X分钟后重置
+                const intervalMs = (config.resetInterval || 30) * 60 * 1000;
+                if (state.lastActivityTime && (Date.now() - state.lastActivityTime > intervalMs)) {
+                    needReset = true;
+                    console.log('[B站学习助手] interval策略: 距上次活动超过', config.resetInterval, '分钟，触发重置');
+                }
+                break;
+            }
+        }
+
+        // 更新上一 tick 状态
+        _wasStudyTime = isStudyTimeNow;
+
+        if (needReset) {
+            return resetIntervention();
+        }
+
+        return state;
+    }
+
+    // 更新活动时间（主定时器每秒调用）
+    function touchActivity() {
+        const state = load();
+        state.lastActivityTime = Date.now();
+        save(state);
+    }
+
+    // 累加学习时间（duration策略用，主定时器每秒调用）
+    function addStudySeconds(seconds) {
+        const state = load();
+        state.accumulatedStudyTime += seconds;
+        save(state);
+    }
+
+    // 同步到 window.__bilibiliStudyAppState（兼容现有代码）
+    function syncToAppState() {
+        const state = load();
+        const appState = window.__bilibiliStudyAppState;
+        if (appState) {
+            appState.currentStage = state.currentStage;
+            appState.distractionStartTime = state.distractionStartTime;
+            appState.isStudying = state.isStudying;
+        }
+    }
+
+    // 从 window.__bilibiliStudyAppState 同步到全局（用于旧代码写入后同步）
+    function syncFromAppState() {
+        const appState = window.__bilibiliStudyAppState;
+        if (appState) {
+            update({
+                currentStage: appState.currentStage,
+                distractionStartTime: appState.distractionStartTime,
+                isStudying: appState.isStudying,
+            });
+        }
+    }
+
+    // 初始化：读取全局状态并同步到 appState
+    function init() {
+        const state = load();
+        const appState = window.__bilibiliStudyAppState;
+        if (appState) {
+            appState.currentStage = state.currentStage;
+            appState.distractionStartTime = state.distractionStartTime;
+            appState.isStudying = state.isStudying;
+        }
+        // 初始化 _wasStudyTime
+        _wasStudyTime = ConfigManager.isStudyTime();
+        console.log('[B站学习助手] GlobalStateManager.init: 全局状态已加载', {
+            currentStage: state.currentStage,
+            isStudying: state.isStudying,
+            resetStrategy: ConfigManager.get().resetStrategy,
+        });
+    }
+
+    return {
+        init,
+        load,
+        save,
+        get,
+        set,
+        update,
+        resetIntervention,
+        checkAndReset,
+        touchActivity,
+        addStudySeconds,
+        syncToAppState,
+        syncFromAppState,
+    };
+})();
+
+// ==========================================
+// HistoryVideoTracker Module (v1.2.3 新增)
+// ==========================================
+// 记录用户观看/离开的所有视频 BV 号，含 reason/leftAt/title
+// 任何"离开当前视频"的行为都记录，不限于多窗口场景
+const HistoryVideoTracker = (function() {
+    const HISTORY_KEY = 'bilibiliStudy_historyVideos';
+    const MAX_RECORDS = 20;  // 最多保存20条
+
+    // 获取历史视频列表
+    function getAll() {
+        try {
+            const stored = localStorage.getItem(HISTORY_KEY);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+        } catch (e) {
+            console.warn('[B站学习助手] HistoryVideoTracker.getAll: 读取失败', e);
+        }
+        return [];
+    }
+
+    // 保存历史视频列表
+    function saveAll(records) {
+        try {
+            // 去重：同一个 BV 号只保留最新的记录
+            const seen = new Set();
+            const deduped = [];
+            for (let i = records.length - 1; i >= 0; i--) {
+                if (!seen.has(records[i].bv)) {
+                    seen.add(records[i].bv);
+                    deduped.unshift(records[i]);
+                }
+            }
+            // FIFO：超出上限则移除最旧的
+            while (deduped.length > MAX_RECORDS) {
+                deduped.shift();
+            }
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(deduped));
+        } catch (e) {
+            console.warn('[B站学习助手] HistoryVideoTracker.saveAll: 写入失败', e);
+        }
+    }
+
+    // 记录一条视频离开记录
+    // bv: BV号
+    // title: 视频标题
+    // type: 'study' / 'distraction'
+    // reason: 'intervention' / 'user_close' / 'user_navigate' / 'multiwindow' / 'return_learning'
+    // watchDuration: 观看秒数（可选）
+    function record(bv, title, type, reason, watchDuration) {
+        if (!bv) return;
+        const records = getAll();
+        records.push({
+            bv: bv,
+            title: title || bv,
+            type: type || 'distraction',
+            watchedAt: Date.now() - (watchDuration || 0) * 1000,  // 推算开始观看时间
+            leftAt: Date.now(),
+            watchDuration: watchDuration || 0,
+            reason: reason || 'unknown',
+        });
+        saveAll(records);
+        console.log('[B站学习助手] HistoryVideoTracker.record:', { bv, type, reason });
+    }
+
+    // 清空所有记录
+    function clear() {
+        try {
+            localStorage.removeItem(HISTORY_KEY);
+        } catch (e) {
+            console.warn('[B站学习助手] HistoryVideoTracker.clear: 清除失败', e);
+        }
+    }
+
+    // 获取最近 N 条记录
+    function getRecent(n) {
+        const records = getAll();
+        return records.slice(-n);
+    }
+
+    return {
+        getAll,
+        record,
+        clear,
+        getRecent,
+    };
+})();
 // ==========================================
 const StorageManager = (function() {
     const STORAGE_PREFIX = "bilibiliStudyAssistant_";
@@ -1592,6 +2058,7 @@ const PageMonitor = (function() {
     const BV_PATTERN = /\/video\/(BV[\w]+)/;
 
     let currentBV = null;
+    let lastBV = null;       // v1.2.3: 记录上一个BV号，用于SPA导航时追踪离开的视频
     let observer = null;
     let routeChangeCallback = null;
 
@@ -1625,11 +2092,17 @@ const PageMonitor = (function() {
     function onRouteChange() {
         const newBV = getCurrentBV();
         if (newBV !== currentBV) {
+            lastBV = currentBV;  // v1.2.3: 保存旧BV号
             currentBV = newBV;
             if (routeChangeCallback) {
                 routeChangeCallback(currentBV);
             }
         }
+    }
+
+    // v1.2.3: 获取上一个BV号（SPA导航离开的视频）
+    function getLastBV() {
+        return lastBV;
     }
 
     // Set up MutationObserver for DOM changes (SPA navigation)
@@ -1686,6 +2159,7 @@ const PageMonitor = (function() {
         init,
         isVideoPage,
         getCurrentBV,
+        getLastBV,
         isPageActive,
         isFullscreen,
         observeSPAChanges,
@@ -2221,7 +2695,7 @@ const DetailPanel = (function() {
                     </div>
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">干预阶段：</span>
-                        <span class="bilibili-study-stat-value">${currentStage} / ${config.interventionStages.length - 1}</span>
+                        <span class="bilibili-study-stat-value">${currentStage} / ${ConfigManager.getEffectiveInterventionStages().length - 1}</span>
                     </div>
                     <div class="bilibili-study-action-buttons">
                         <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-stop-intervention">
@@ -2447,6 +2921,98 @@ const DetailPanel = (function() {
         `;
     }
 
+    // Render Module 6: History video records (v1.2.4)
+    // 显示用户刷视频离开的记录，非学习时段结束后解锁
+    function renderModule6() {
+        const historyVideos = HistoryVideoTracker.getRecent(10);
+        const isStudyTime = ConfigManager.isStudyTime();
+        const isRestPeriod = ConfigManager.isRestPeriod();
+        // 解锁条件：非学习时段 或 休息时段
+        const isUnlocked = !isStudyTime || isRestPeriod;
+
+        if (!isUnlocked) {
+            return `
+                <div class="bilibili-study-modal-module" id="bilibili-study-module6-wrapper">
+                    <h3 class="bilibili-study-module-title">📼 历史视频</h3>
+                    <div class="bilibili-study-module-content">
+                        <div class="bilibili-study-locked-panel" style="text-align: center; padding: 20px; opacity: 0.6;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
+                            <p style="margin: 0; font-size: 13px; color: inherit;">学习时段内不可查看，休息后再来回顾吧</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (historyVideos.length === 0) {
+            return `
+                <div class="bilibili-study-modal-module" id="bilibili-study-module6-wrapper">
+                    <h3 class="bilibili-study-module-title">📼 历史视频</h3>
+                    <div class="bilibili-study-module-content">
+                        <p class="bilibili-study-no-data">暂无历史视频记录</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        const itemsHtml = historyVideos.map(v => {
+            const leftTime = v.leftAt ? new Date(v.leftAt) : null;
+            const timeStr = leftTime
+                ? `${leftTime.getHours().toString().padStart(2, '0')}:${leftTime.getMinutes().toString().padStart(2, '0')}`
+                : '';
+            const durationStr = v.watchDuration > 0
+                ? `${Math.floor(v.watchDuration / 60)}分${v.watchDuration % 60}秒`
+                : '';
+            // 离开原因映射
+            const reasonMap = {
+                'intervention': '🎯 干预跳转',
+                'user_close': '👋 关闭页面',
+                'user_navigate': '🔀 自主离开',
+                'return_learning': '📚 返回学习',
+                'multiwindow': '🪟 多窗口切换'
+            };
+            const reasonLabel = reasonMap[v.reason] || v.reason || '';
+            // 截断标题
+            const shortTitle = v.title.length > 28 ? v.title.slice(0, 28) + '…' : v.title;
+
+            return `
+                <div class="bilibili-study-history-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,0.15);">
+                    <a href="https://www.bilibili.com/video/${v.bv}" target="_blank"
+                       class="bilibili-study-history-link"
+                       style="flex: 1; text-decoration: none; color: inherit; min-width: 0;"
+                       title="${v.title}">
+                        <div style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${shortTitle}</div>
+                        <div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">
+                            <span>${v.bv}</span>
+                            ${durationStr ? `<span style="margin-left: 8px;">⏱${durationStr}</span>` : ''}
+                        </div>
+                    </a>
+                    <div style="flex-shrink: 0; text-align: right;">
+                        <div style="font-size: 11px; opacity: 0.5;">${timeStr}</div>
+                        <div style="font-size: 10px; opacity: 0.4;">${reasonLabel}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="bilibili-study-modal-module" id="bilibili-study-module6-wrapper">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <h3 class="bilibili-study-module-title" style="margin-bottom: 0;">📼 历史视频</h3>
+                    <button id="bilibili-study-clear-history"
+                            class="bilibili-study-btn bilibili-study-btn-secondary"
+                            style="padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 6px;"
+                            title="清空历史视频记录">
+                        🗑️ 清空
+                    </button>
+                </div>
+                <div class="bilibili-study-module-content">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }
+
     // Close modal
     function close() {
         if (modalElement) {
@@ -2506,6 +3072,7 @@ const DetailPanel = (function() {
                     ${renderModule3()}
                     ${renderModule4()}
                     ${renderModule5()}
+                    ${renderModule6()}
                 </div>
             </div>
         `;
@@ -2555,6 +3122,8 @@ const DetailPanel = (function() {
                         window.__bilibiliStudyAppState.currentStage = 0;
                         window.__bilibiliStudyAppState.distractionStartTime = null;
                     }
+                    // v1.2.3: 同步到全局状态
+                    GlobalStateManager.syncFromAppState();
                     // Remove visual interventions
                     document.body.classList.remove(
                         'bilibili-study-intervention-stage1',
@@ -2609,6 +3178,23 @@ const DetailPanel = (function() {
             const resetVocabBtn = document.getElementById('bilibili-study-reset-vocab');
             if (resetVocabBtn) {
                 resetVocabBtn.addEventListener('click', handleResetVocabBtn);
+            }
+
+            // v1.2.4: 清空历史视频记录
+            const clearHistoryBtn = document.getElementById('bilibili-study-clear-history');
+            if (clearHistoryBtn) {
+                clearHistoryBtn.addEventListener('click', function() {
+                    if (confirm('确定要清空所有历史视频记录吗？')) {
+                        HistoryVideoTracker.clear();
+                        // 刷新 Module 6
+                        const m6 = document.getElementById('bilibili-study-module6-wrapper');
+                        if (m6) {
+                            const t = document.createElement('div');
+                            t.innerHTML = renderModule6();
+                            m6.replaceWith(t.firstElementChild);
+                        }
+                    }
+                });
             }
         }, 100);
     }
@@ -2711,6 +3297,7 @@ const DetailPanel = (function() {
                     <button class="bilibili-study-settings-tab ${activeSettingsTab === 'periods' ? 'active' : ''}" data-tab="periods">⏰ 学习时段</button>
                     <button class="bilibili-study-settings-tab ${activeSettingsTab === 'whitelist' ? 'active' : ''}" data-tab="whitelist">📚 学习视频</button>
                     <button class="bilibili-study-settings-tab ${activeSettingsTab === 'vocab' ? 'active' : ''}" data-tab="vocab">📝 词库管理</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'intervention' ? 'active' : ''}" data-tab="intervention">🎯 干预设置</button>
                 </div>
                 <div class="bilibili-study-settings-body" id="bilibili-study-settings-body">
                     ${renderSettingsContent(activeSettingsTab, config)}
@@ -2738,6 +3325,7 @@ const DetailPanel = (function() {
             case 'periods': return renderPeriodsSettings(config);
             case 'whitelist': return renderWhitelistSettings(config);
             case 'vocab': return renderVocabSettings(config);
+            case 'intervention': return renderInterventionSettings(config);
             default: return renderPeriodsSettings(config);
         }
     }
@@ -2818,6 +3406,119 @@ const DetailPanel = (function() {
                 </div>
                 <div id="bilibili-study-vocab-error" class="bilibili-study-settings-error"></div>
                 <div id="bilibili-study-vocab-preview" class="bilibili-study-settings-hint"></div>
+            </div>
+        `;
+    }
+
+    // v1.2.4: 干预设置 tab
+    function renderInterventionSettings(config) {
+        const level = config.interventionLevel || 'standard';
+        const visualLevel = config.visualEffectLevel || 'heavy';
+        const resetStrategy = config.resetStrategy || 'period';
+        const resetDuration = config.resetDuration || 30;
+        const resetInterval = config.resetInterval || 30;
+
+        // 干预等级描述
+        const levelDescriptions = {
+            gentle:   '温和：分心3分钟才开始干预，弹窗间隔较长',
+            standard: '标准：分心1分钟开始干预，平衡提醒与体验',
+            strict:   '严格：分心30秒即干预，弹窗密集，强力约束'
+        };
+
+        // 视觉效果描述
+        const visualDescriptions = {
+            none:   '无视觉效果：页面外观不变，仅弹窗提醒',
+            light:  '轻度：轻微灰度变化，视觉影响较小',
+            medium: '中度：明显色彩翻转和灰度，保持可读性',
+            heavy:  '重度：强烈色彩翻转和灰度，视觉冲击大'
+        };
+
+        // 各等级的阶段时间表
+        const stageTimelines = {
+            gentle:   ['3min 视觉', '10min 弹窗2min', '20min 弹窗1min', '40min 弹窗30s'],
+            standard: ['1min 视觉', '3min 弹窗1min', '10min 弹窗30s', '20min 弹窗15s'],
+            strict:   ['30s 视觉', '1min 弹窗30s', '3min 弹窗15s', '10min 弹窗10s']
+        };
+        const timeline = stageTimelines[level] || stageTimelines.standard;
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🎯 干预等级</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制干预的触发速度和弹窗频率</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="gentle" ${level === 'gentle' ? 'checked' : ''}>
+                        <span>🕊️ 温和</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="standard" ${level === 'standard' ? 'checked' : ''}>
+                        <span>⚖️ 标准</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="strict" ${level === 'strict' ? 'checked' : ''}>
+                        <span>🔥 严格</span>
+                    </label>
+                </div>
+                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${levelDescriptions[level] || ''}</p>
+                <div style="margin-top: 10px; padding: 10px; background: rgba(128,128,128,0.08); border-radius: 6px; font-size: 12px;">
+                    <p style="margin: 0 0 4px 0; font-weight: bold;">阶段时间表：</p>
+                    ${timeline.map((t, i) => `<div style="padding: 2px 0; opacity: 0.7;">阶段${i + 1}: ${t}</div>`).join('')}
+                </div>
+            </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">👁️ 视觉效果强度</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制分心时页面的色彩翻转和灰度程度</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="none" ${visualLevel === 'none' ? 'checked' : ''}>
+                        <span>❌ 无</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="light" ${visualLevel === 'light' ? 'checked' : ''}>
+                        <span>🟢 轻度</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="medium" ${visualLevel === 'medium' ? 'checked' : ''}>
+                        <span>🟡 中度</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="heavy" ${visualLevel === 'heavy' ? 'checked' : ''}>
+                        <span>🔴 重度</span>
+                    </label>
+                </div>
+                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${visualDescriptions[visualLevel] || ''}</p>
+            </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🔄 干预重置策略</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">决定干预状态何时重置回初始</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="period" ${resetStrategy === 'period' ? 'checked' : ''}>
+                        <span>⏰ 跟随时段</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="duration" ${resetStrategy === 'duration' ? 'checked' : ''}>
+                        <span>⏱️ 固定时长</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="interval" ${resetStrategy === 'interval' ? 'checked' : ''}>
+                        <span>📐 固定间隔</span>
+                    </label>
+                </div>
+                <div id="bilibili-study-reset-duration-row" style="margin-top: 8px; display: ${resetStrategy === 'duration' ? 'flex' : 'none'}; align-items: center; gap: 8px;">
+                    <label style="font-size: 13px; white-space: nowrap;">累计学习</label>
+                    <input type="number" id="bilibili-study-reset-duration" value="${resetDuration}" min="5" max="120"
+                           style="width: 60px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; text-align: center;">
+                    <span style="font-size: 13px;">分钟后重置</span>
+                </div>
+                <div id="bilibili-study-reset-interval-row" style="margin-top: 8px; display: ${resetStrategy === 'interval' ? 'flex' : 'none'}; align-items: center; gap: 8px;">
+                    <label style="font-size: 13px; white-space: nowrap;">离开超过</label>
+                    <input type="number" id="bilibili-study-reset-interval" value="${resetInterval}" min="5" max="120"
+                           style="width: 60px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; text-align: center;">
+                    <span style="font-size: 13px;">分钟后重置</span>
+                </div>
             </div>
         `;
     }
@@ -2903,6 +3604,45 @@ const DetailPanel = (function() {
                 });
             });
         }
+
+        // v1.2.4: === 干预设置 tab ===
+        // resetStrategy 联动显示/隐藏参数输入框
+        settingsElement?.querySelectorAll('input[name="resetStrategy"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const durationRow = document.getElementById('bilibili-study-reset-duration-row');
+                const intervalRow = document.getElementById('bilibili-study-reset-interval-row');
+                if (durationRow) durationRow.style.display = this.value === 'duration' ? 'flex' : 'none';
+                if (intervalRow) intervalRow.style.display = this.value === 'interval' ? 'flex' : 'none';
+            });
+        });
+
+        // 干预等级切换时更新描述和时间表
+        settingsElement?.querySelectorAll('input[name="interventionLevel"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // 重新渲染干预设置面板以更新描述
+                const body = document.getElementById('bilibili-study-settings-body');
+                if (body) {
+                    const config = ConfigManager.get();
+                    // 临时更新选择的等级
+                    config.interventionLevel = this.value;
+                    body.innerHTML = renderSettingsContent('intervention', config);
+                    bindSettingsTabEvents();
+                }
+            });
+        });
+
+        // 视觉效果切换时更新描述
+        settingsElement?.querySelectorAll('input[name="visualEffectLevel"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const body = document.getElementById('bilibili-study-settings-body');
+                if (body) {
+                    const config = ConfigManager.get();
+                    config.visualEffectLevel = this.value;
+                    body.innerHTML = renderSettingsContent('intervention', config);
+                    bindSettingsTabEvents();
+                }
+            });
+        });
 
         // === 白名单 tab ===
         // 删除白名单项
@@ -3072,6 +3812,50 @@ const DetailPanel = (function() {
                     hasChanges = true;
                 } else if (newVocab.length === 0 && oldVocab.length > 0) {
                     errors.push('词库不能为空，至少需要1个词条');
+                }
+            }
+        }
+
+        // v1.2.4: === 保存干预设置 ===
+        if (activeSettingsTab === 'intervention') {
+            const levelRadio = settingsElement?.querySelector('input[name="interventionLevel"]:checked');
+            const visualRadio = settingsElement?.querySelector('input[name="visualEffectLevel"]:checked');
+            const strategyRadio = settingsElement?.querySelector('input[name="resetStrategy"]:checked');
+
+            const newLevel = levelRadio ? levelRadio.value : null;
+            const newVisual = visualRadio ? visualRadio.value : null;
+            const newStrategy = strategyRadio ? strategyRadio.value : null;
+
+            const config = ConfigManager.get();
+
+            if (newLevel && newLevel !== config.interventionLevel) {
+                ConfigManager.save({ interventionLevel: newLevel });
+                hasChanges = true;
+            }
+            if (newVisual && newVisual !== config.visualEffectLevel) {
+                ConfigManager.save({ visualEffectLevel: newVisual });
+                hasChanges = true;
+            }
+            if (newStrategy && newStrategy !== config.resetStrategy) {
+                ConfigManager.save({ resetStrategy: newStrategy });
+                hasChanges = true;
+            }
+
+            // 保存固定时长/间隔参数
+            const durationInput = document.getElementById('bilibili-study-reset-duration');
+            const intervalInput = document.getElementById('bilibili-study-reset-interval');
+            if (durationInput) {
+                const dur = parseInt(durationInput.value) || 30;
+                if (dur !== config.resetDuration) {
+                    ConfigManager.save({ resetDuration: Math.max(5, Math.min(120, dur)) });
+                    hasChanges = true;
+                }
+            }
+            if (intervalInput) {
+                const intv = parseInt(intervalInput.value) || 30;
+                if (intv !== config.resetInterval) {
+                    ConfigManager.save({ resetInterval: Math.max(5, Math.min(120, intv)) });
+                    hasChanges = true;
                 }
             }
         }
@@ -3639,8 +4423,8 @@ const InterventionController = (function() {
     }
 
     function getCurrentStage(distractionDuration) {
-        const config = ConfigManager.get();
-        const stages = config.interventionStages || [];
+        // v1.2.4: 使用 getEffectiveInterventionStages 替代 config.interventionStages
+        const stages = ConfigManager.getEffectiveInterventionStages();
         let currentStage = 0;
         for (let i = stages.length - 1; i >= 0; i--) {
             if (distractionDuration >= stages[i].threshold) {
@@ -3666,9 +4450,11 @@ const InterventionController = (function() {
         const stage1Total = 240;
         const progress = Math.min(1, Math.max(0, stage1Duration / stage1Total));
 
-        const invert = Math.floor(progress * 100);
-        const grayscale = Math.floor(progress * 80);
-        const opacity = 1 - (progress * 0.3);
+        // v1.2.4: 根据 visualEffectLevel 控制视觉效果强度
+        const effectParams = ConfigManager.getVisualEffectParams();
+        const invert = Math.floor(progress * effectParams.maxInvert);
+        const grayscale = Math.floor(progress * effectParams.maxGrayscale);
+        const opacity = 1 - progress * (1 - effectParams.minOpacity);
 
         const selectors = [
             '.video-container',
@@ -3731,6 +4517,11 @@ const InterventionController = (function() {
 
     function returnToLearning() {
         closeCurrentModal();
+        // v1.2.3: 记录离开的视频BV号（干预跳转）
+        const currentBV = PageMonitor.getCurrentBV();
+        if (currentBV) {
+            HistoryVideoTracker.record(currentBV, document.title, 'distraction', 'intervention');
+        }
         const defaultBV = ConfigManager.getDefaultReturnBV();
         if (defaultBV) {
             window.location.href = `https://www.bilibili.com/video/${defaultBV}`;
@@ -4099,12 +4890,15 @@ const InterventionController = (function() {
 
         // 如果有提示字母被揭示，标记为wasHinted
         const wasHinted = revealedIndices.size > 0;
+        // v1.2.4 fix: updateMastery 每次提交都更新掌握度（合理），但 recordAnswer/recordWordAttempt
+        // 只在最终结果确定时调用，避免同一词出现多条答题记录
         WordVerifier.updateMastery(currentWord, correct, wasHinted);
-        WordVerifier.recordAnswer(currentWord, correct);
-        StatisticsTracker.recordWordAttempt(correct);
 
         if (correct) {
             console.log('[B站学习助手]   → 回答正确! 弹窗即将关闭');
+            // v1.2.4 fix: 答对时才记录最终结果
+            WordVerifier.recordAnswer(currentWord, true);
+            StatisticsTracker.recordWordAttempt(true);
             feedback.innerHTML = `<span style="color: ${isDark ? '#4ade80' : '#16a34a'}; font-weight: bold;">✅ 回答正确！</span>`;
             // 正确答案直接关闭
             setTimeout(() => closeCurrentModal(), 300);
@@ -4138,6 +4932,9 @@ const InterventionController = (function() {
             // 检查是否全部揭示
             if (revealedIndices.size >= totalLength) {
                 console.log('[B站学习助手]   → 全部字母已揭示! 进入记忆模式(6秒)');
+                // v1.2.4 fix: 全部字母揭示 = 该轮答题最终失败，记录一次错误
+                WordVerifier.recordAnswer(currentWord, false);
+                StatisticsTracker.recordWordAttempt(false);
                 // 全部揭示 - 显示完整单词，6秒后自动关闭
                 const modal = document.getElementById('bilibili-study-word-modal');
                 console.log('[B站学习助手]   modal=', !!modal);
@@ -4189,7 +4986,8 @@ const InterventionController = (function() {
         }
 
         const config = ConfigManager.get();
-        const stages = config.interventionStages || [];
+        // v1.2.4: 使用 getEffectiveInterventionStages 替代 config.interventionStages
+        const stages = ConfigManager.getEffectiveInterventionStages();
         const stageConfig = stages[stage];
 
         if (!stageConfig || stageConfig.interval === 0) {
@@ -4275,7 +5073,14 @@ const InterventionController = (function() {
             if (lastPopupTime > 0) {
                 lastPopupTime += totalHiddenTime;
             }
+            // v1.2.3: 同步到全局状态
+            GlobalStateManager.syncFromAppState();
             totalHiddenTime = 0;
+        }
+
+        // v1.2.3: 休息时段不干预
+        if (!isStudyTime && ConfigManager.isRestPeriod()) {
+            return;
         }
 
         if (!isStudyTime) {
@@ -4284,6 +5089,8 @@ const InterventionController = (function() {
             state.distractionStartTime = null;
             removeVisualIntervention();
             reset();
+            // v1.2.3: 同步到全局状态
+            GlobalStateManager.syncFromAppState();
             return;
         }
 
@@ -4293,6 +5100,8 @@ const InterventionController = (function() {
             state.distractionStartTime = null;
             removeVisualIntervention();
             reset();
+            // v1.2.3: 同步到全局状态
+            GlobalStateManager.syncFromAppState();
             return;
         }
 
@@ -4300,6 +5109,8 @@ const InterventionController = (function() {
             if (state.distractionStartTime === null) {
                 state.distractionStartTime = Date.now();
                 state.isStudying = false;
+                // v1.2.3: 同步到全局状态
+                GlobalStateManager.syncFromAppState();
                 console.log('[B站学习助手] check: 首次分心，弹出确认弹窗');
                 showConfirmModal();
                 return;
@@ -4315,6 +5126,8 @@ const InterventionController = (function() {
                     lastPopupTime = state.distractionStartTime + (newStage === 2 ? 300 : newStage === 3 ? 600 : 1200) * 1000;
                 }
                 console.log('[B站学习助手] check: 阶段变更 →', newStage, '分心时长=', distractionDuration + 's');
+                // v1.2.3: 同步到全局状态
+                GlobalStateManager.syncFromAppState();
             }
 
             if (state.currentStage === 1) {
@@ -4467,25 +5280,40 @@ const InterventionController = (function() {
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
 
+        // ── v1.2.3: 全局状态重置策略检查 ──
+        // 在干预逻辑之前执行，确保时段结束时及时重置
+        GlobalStateManager.checkAndReset(isStudyTime);
+        // 从全局状态同步到 appState（兼容现有代码）
+        GlobalStateManager.syncToAppState();
+
         // 每60秒输出一次心跳日志，确认定时器在运行
         if (++_mainTimerLogCounter % 60 === 0) {
             console.log('[B站学习助手] 主定时器心跳:', {
                 isVideoPage, isPageActive, isStudyTime, isWhitelisted,
-                currentBV, currentStage: state.currentStage, url: window.location.href
+                currentBV, currentStage: state.currentStage, url: window.location.href,
+                resetStrategy: ConfigManager.get().resetStrategy,
             });
         }
 
         // Update statistics based on current state
         if (isVideoPage && isPageActive && isStudyTime) {
+            // 更新活动时间（interval策略用）
+            GlobalStateManager.touchActivity();
+
             if (isWhitelisted) {
                 // Studying on whitelisted video
                 state.isStudying = true;
                 StatisticsTracker.addStudyTime(1);
+                // 累加学习时间（duration策略用）
+                GlobalStateManager.addStudySeconds(1);
             } else {
                 // Distracted on non-whitelisted video
                 state.isStudying = false;
                 StatisticsTracker.addDistractionTime(1);
             }
+
+            // ── v1.2.3: 同步 appState 到全局状态 ──
+            GlobalStateManager.syncFromAppState();
         }
 
         // Run intervention check
@@ -4508,20 +5336,42 @@ const InterventionController = (function() {
         const state = window.__bilibiliStudyAppState;
         const isWhitelisted = ConfigManager.isWhitelisted(newBV);
 
+        // v1.2.3: SPA导航时记录旧视频的BV号
+        // 注意：此时 URL 已变化，无法获取旧 BV，但可以在 PageMonitor 中记录
+        // 使用 _lastBVBeforeSPA 追踪（在下面 beforeunload 钩子中也有记录）
+
         if (isWhitelisted || !ConfigManager.isStudyTime()) {
             // 切到白名单视频或非学习时段：重置干预状态
+            // v1.2.3: 记录离开原因
             if (state) {
+                // 记录旧视频BV号（如果有的话）
+                const oldBV = PageMonitor.getLastBV();
+                if (oldBV && oldBV !== newBV) {
+                    const reason = isWhitelisted ? 'return_learning' : 'user_navigate';
+                    HistoryVideoTracker.record(oldBV, document.title,
+                        state.isStudying ? 'study' : 'distraction', reason);
+                }
                 state.currentStage = 0;
                 state.distractionStartTime = null;
                 state.isStudying = true;
             }
             InterventionController.reset();
             removeVisualIntervention();
+            GlobalStateManager.syncFromAppState();
             console.log('[B站学习助手] SPA导航到白名单视频/非学习时段，重置干预状态');
         } else {
             // 切到另一个非白名单视频：保留干预状态，关闭已有弹窗
             // 不重置 distractionStartTime 和 currentStage，让干预计时延续
+            // v1.2.3: 记录旧视频BV号
+            if (state) {
+                const oldBV = PageMonitor.getLastBV();
+                if (oldBV && oldBV !== newBV) {
+                    HistoryVideoTracker.record(oldBV, document.title,
+                        state.isStudying ? 'study' : 'distraction', 'user_navigate');
+                }
+            }
             InterventionController.closeCurrentModal();
+            GlobalStateManager.syncFromAppState();
             console.log('[B站学习助手] SPA导航到非白名单视频，保留干预状态', {
                 currentStage: state?.currentStage,
                 distractionStartTime: state?.distractionStartTime,
@@ -4551,6 +5401,38 @@ const InterventionController = (function() {
             'bilibili-study-intervention-stage4'
         );
     }
+
+    // ── v1.2.3: 初始化 GlobalStateManager ──
+    // 在所有模块初始化后调用，从 localStorage 加载全局状态
+    GlobalStateManager.init();
+
+    // ── v1.2.4: 恢复视觉干预效果 ──
+    // 全局状态同步了 currentStage 但 DOM 上的 CSS class 不会自动恢复
+    // 新窗口/刷新后需要根据持久化的 stage 重新应用视觉效果
+    try {
+        const restoredStage = GlobalStateManager.get('currentStage');
+        if (restoredStage > 0 && PageMonitor.isVideoPage()) {
+            console.log('[B站学习助手] init: 恢复视觉干预效果, stage=', restoredStage);
+            InterventionController.applyVisualIntervention(restoredStage);
+        }
+    } catch(e) {
+        console.error('[B站学习助手] init: 恢复视觉干预效果失败', e);
+    }
+
+    // ── v1.2.3: beforeunload 钩子 ──
+    // 用户关闭标签页/窗口时，记录当前视频的BV号
+    window.addEventListener('beforeunload', function() {
+        const currentBV = PageMonitor.getCurrentBV();
+        const state = window.__bilibiliStudyAppState;
+        if (currentBV && state) {
+            HistoryVideoTracker.record(currentBV, document.title,
+                state.isStudying ? 'study' : 'distraction', 'user_close');
+        }
+        // 确保全局状态已同步
+        if (state) {
+            GlobalStateManager.syncFromAppState();
+        }
+    });
 
     console.log('B站学习专注提醒助手 initialized successfully');
 

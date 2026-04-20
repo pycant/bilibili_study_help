@@ -1,5 +1,86 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.2.4] - 2026-04-20
+
+### Bug修复 🐛
+
+#### 答题记录多条重复
+- **问题**：词汇验证时，同一词出现多条答题记录（如 `✗复杂的 ✗复杂的 ✓复杂的`）
+- **根因**：`handleWordSubmit()` 每次提交都调用 `recordAnswer()` 和 `recordWordAttempt()`，答错后揭示字母继续输入会重复记录
+- **修复**：`recordAnswer`/`recordWordAttempt` 只在最终结果确定时调用——答对时记录一次✓，全部字母揭示时记录一次✗；`updateMastery` 保持每次提交都更新（合理）
+
+#### 色彩翻转效果不继承
+- **问题**：多窗口播放/关闭后重新打开时，干预状态（currentStage）虽从 localStorage 继承，但页面视觉效果（色彩翻转、灰度）未恢复
+- **根因**：`GlobalStateManager.init()` 只同步了 appState 数据，没有调用 `applyVisualIntervention()` 恢复 CSS class
+- **修复**：在 `GlobalStateManager.init()` 之后，根据持久化的 `currentStage` 调用 `InterventionController.applyVisualIntervention()` 恢复视觉效果
+
+### 新增功能 ✨
+
+#### 历史视频面板（Module 6）
+- **位置**：详细统计面板底部，新增「📼 历史视频」模块
+- **锁定机制**：学习时段内显示🔒锁定状态，非学习时段/休息时段解锁可查看
+- **内容**：显示最近10条视频记录，含标题、BV号、观看时长、离开时间、离开原因
+- **交互**：点击标题可跳转回原视频，提供清空按钮
+
+#### ⚙️ 干预设置 tab
+- **位置**：设置面板新增「🎯 干预设置」tab 页
+- **干预等级**：三档可选
+  - 🕊️ 温和：分心3分钟才开始干预，弹窗间隔较长
+  - ⚖️ 标准（默认）：分心1分钟开始干预，平衡提醒与体验
+  - 🔥 严格：分心30秒即干预，弹窗密集，强力约束
+- **视觉效果强度**：四档可选
+  - ❌ 无：页面外观不变，仅弹窗提醒
+  - 🟢 轻度：轻微灰度变化（max grayscale 40%, opacity 0.85）
+  - 🟡 中度：明显色彩翻转（max grayscale 60%, opacity 0.75）
+  - 🔴 重度（默认）：强烈视觉冲击（max grayscale 80%, opacity 0.6）
+- **干预重置策略**：从设置面板可配置（之前只能通过代码配置）
+  - ⏰ 跟随时段（默认）/ ⏱️ 固定时长 / 📐 固定间隔
+  - 选择固定时长/间隔时，动态显示参数输入框
+
+### 改进 🔧
+
+- `ConfigManager` 新增 `getEffectiveInterventionStages()` 方法：根据 `interventionLevel` 动态计算干预阶段阈值
+- `ConfigManager` 新增 `getVisualEffectParams()` 方法：根据 `visualEffectLevel` 返回视觉参数
+- `updateProgressiveVisualEffect()` 使用 `getVisualEffectParams()` 控制效果强度
+- `getCurrentStage()` / `showPopupIfNeeded()` 统一使用 `getEffectiveInterventionStages()` 替代硬编码的 `config.interventionStages`
+- 新增配置字段：`interventionLevel` / `visualEffectLevel`
+- 新增 CSS 样式：radio 选项组（`.bilibili-study-settings-option-group` / `.bilibili-study-settings-radio`）+ 暗色模式适配
+
+---
+
+## [1.2.3] - 2026-04-20
+
+### 新增功能 ✨
+
+#### 全局干预状态持久化（GlobalStateManager）
+- **核心改动**：将干预状态（currentStage/distractionStartTime/isStudying）从窗口内存变量迁移到 localStorage `bilibiliStudy_globalState`
+- **解决问题**：用户关窗口再开，干预状态归零 → 现在从上次的阶段继续
+- **三重重置策略**（用户可配置 `resetStrategy`）：
+  - `period`（默认）：跟随学习时段配置，每个时段结束时重置
+  - `duration`：累计学习满X分钟后重置（默认30分钟）
+  - `interval`：距上次活动超过X分钟后重置（默认30分钟）
+- **休息时段检测**：学习时段之间的间隙（如12:00-13:30）不干预、不重置
+- 新增配置字段：`resetStrategy`/`resetDuration`/`resetInterval`
+
+#### 离开视频必记BV号（HistoryVideoTracker）
+- **新增模块**：记录用户观看/离开的所有视频 BV 号
+- **触发场景**：
+  - `beforeunload`：用户关闭标签页 → reason='user_close'
+  - SPA路由变化：在B站内导航 → reason='user_navigate'
+  - 干预跳转（returnToLearning）→ reason='intervention'
+  - 切到白名单视频 → reason='return_learning'
+- **数据结构**：`bilibiliStudy_historyVideos`，含 bv/title/type/watchedAt/leftAt/watchDuration/reason
+- 最多保存20条，同BV号去重保留最新
+
+### 改进 🔧
+
+- `PageMonitor` 新增 `getLastBV()` 方法，追踪SPA导航离开的视频BV号
+- `InterventionController.check()` 添加全局状态同步，每个状态变更点同步到 localStorage
+- 休息时段（学习时段之间的间隙）不再执行干预逻辑
+- 主定时器心跳日志新增 `resetStrategy` 字段
+
+---
+
 ## [1.2.2] - 2026-04-18
 
 ### 修复 🐛
