@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.5
+// @version      1.2.6
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -1351,6 +1351,380 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-history-reason {
         color: #777 !important;
     }
+
+    /* ==========================================
+       Multi-Tab Guide (v1.2.6)
+       ========================================== */
+
+    /* 学习窗口叠加层 - 高斯模糊背景 + 标注文字 */
+    .bilibili-study-multi-tab-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000007;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(8px) saturate(0.6);
+        -webkit-backdrop-filter: blur(8px) saturate(0.6);
+        background: rgba(0, 0, 0, 0.4);
+        animation: bilibili-study-fade-in 0.3s ease-out;
+    }
+
+    .bilibili-study-multi-tab-study-message {
+        text-align: center;
+        padding: 40px 50px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+    }
+
+    .bilibili-study-multi-tab-study-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+
+    .bilibili-study-multi-tab-study-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .bilibili-study-multi-tab-study-desc {
+        font-size: 15px;
+        color: #666;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+
+    .bilibili-study-multi-tab-study-hint {
+        font-size: 13px;
+        color: #999;
+        line-height: 1.5;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+
+    /* 引导弹窗 - 分心窗口 */
+    .bilibili-study-multi-tab-guide {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000007;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: bilibili-study-fade-in 0.3s ease-out;
+    }
+
+    .bilibili-study-multi-tab-guide-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        backdrop-filter: blur(6px) saturate(0.7);
+        -webkit-backdrop-filter: blur(6px) saturate(0.7);
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .bilibili-study-multi-tab-guide-content {
+        position: relative;
+        background: #fff;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 480px;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        animation: bilibili-study-slide-up 0.3s ease-out;
+    }
+
+    .bilibili-study-multi-tab-guide-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 20px 24px 14px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .bilibili-study-multi-tab-guide-icon {
+        font-size: 24px;
+    }
+
+    .bilibili-study-multi-tab-guide-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .bilibili-study-multi-tab-guide-body {
+        padding: 18px 24px;
+    }
+
+    .bilibili-study-multi-tab-guide-desc {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 16px;
+        line-height: 1.6;
+    }
+
+    /* 窗口列表 */
+    .bilibili-study-multi-tab-guide-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .bilibili-study-multi-tab-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        border: 1px solid #eee;
+    }
+
+    .bilibili-study-multi-tab-item-study {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+    }
+
+    .bilibili-study-multi-tab-item-current {
+        background: #fef2f2;
+        border-color: #fecaca;
+    }
+
+    .bilibili-study-multi-tab-item-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .bilibili-study-multi-tab-item-title {
+        flex: 1;
+        font-size: 13px;
+        color: #444;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .bilibili-study-multi-tab-item-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 500;
+        flex-shrink: 0;
+    }
+
+    .bilibili-study-multi-tab-badge-study {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .bilibili-study-multi-tab-badge-distraction {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    /* 提示和白名单选项 */
+    .bilibili-study-multi-tab-guide-notice {
+        font-size: 13px;
+        color: #888;
+        margin-bottom: 14px;
+        padding: 10px 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        line-height: 1.5;
+    }
+
+    .bilibili-study-multi-tab-guide-whitelist {
+        margin-bottom: 6px;
+    }
+
+    .bilibili-study-multi-tab-whitelist-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #555;
+        cursor: pointer;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        transition: background 0.2s;
+    }
+
+    .bilibili-study-multi-tab-whitelist-label:hover {
+        background: #dbeafe;
+    }
+
+    .bilibili-study-multi-tab-whitelist-label input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #3b82f6;
+        cursor: pointer;
+    }
+
+    /* 底部按钮 */
+    .bilibili-study-multi-tab-guide-footer {
+        padding: 14px 24px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .bilibili-study-multi-tab-btn {
+        width: 100%;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .bilibili-study-multi-tab-btn-primary {
+        background: #dc2626;
+        color: #fff;
+    }
+
+    .bilibili-study-multi-tab-btn-primary:hover {
+        background: #b91c1c;
+        transform: translateY(-1px);
+    }
+
+    .bilibili-study-multi-tab-btn-secondary {
+        background: #f3f4f6;
+        color: #555;
+        border: 1px solid #d1d5db;
+    }
+
+    .bilibili-study-multi-tab-btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-1px);
+    }
+
+    .bilibili-study-multi-tab-guide-countdown {
+        text-align: center;
+        font-size: 12px;
+        color: #999;
+        padding-top: 4px;
+    }
+
+    /* 浮窗副窗口/暂停样式 */
+    .bilibili-study-floating-secondary {
+        opacity: 0.6 !important;
+    }
+
+    .bilibili-study-floating-negotiating {
+        opacity: 0.75 !important;
+        animation: bilibili-study-pulse-pause 2s ease-in-out infinite;
+    }
+
+    @keyframes bilibili-study-pulse-pause {
+        0%, 100% { opacity: 0.75; }
+        50% { opacity: 0.5; }
+    }
+
+    /* ── 暗色模式适配 ── */
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-study-message {
+        background: rgba(45, 45, 45, 0.95);
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-study-title {
+        color: #eee;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-study-desc {
+        color: #bbb;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-study-hint {
+        color: #888;
+        border-top-color: #444;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-content {
+        background: #2d2d2d;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-header {
+        border-bottom-color: #444;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-title {
+        color: #eee;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-desc {
+        color: #bbb;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-item {
+        background: #3a3a3a;
+        border-color: #4a4a4a;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-item-study {
+        background: rgba(34, 139, 34, 0.12);
+        border-color: rgba(34, 139, 34, 0.25);
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-item-current {
+        background: rgba(220, 20, 60, 0.12);
+        border-color: rgba(220, 20, 60, 0.25);
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-item-title {
+        color: #ccc;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-notice {
+        background: #3a3a3a;
+        color: #999;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-whitelist-label {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.25);
+        color: #bbb;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-whitelist-label:hover {
+        background: rgba(59, 130, 246, 0.18);
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-footer {
+        border-top-color: #444;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-btn-secondary {
+        background: #3a3a3a;
+        color: #bbb;
+        border-color: #555;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-btn-secondary:hover {
+        background: #454545;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-countdown {
+        color: #777;
+    }
 `;
 
 // Inject CSS
@@ -2095,6 +2469,707 @@ const GlobalStateManager = (function() {
 })();
 
 // ==========================================
+// TabManager Module (v1.2.6 新增)
+// ==========================================
+// 多窗口 Master 选举 + 心跳 + 注册表
+// 核心原则：谁被用户关注，谁是 Master
+const TabManager = (function() {
+    // 唯一标签页 ID（同一标签页内持久，跨标签页唯一）
+    const TAB_ID = 'tab_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+
+    // localStorage 键名
+    const MASTER_KEY = 'bilibiliStudy_masterTab';
+    const REGISTRY_KEY = 'bilibiliStudy_tabRegistry';
+
+    // 心跳参数
+    const HEARTBEAT_INTERVAL = 3000;   // 心跳间隔 3 秒
+    const HEARTBEAT_TIMEOUT = 8000;    // 心跳超时 8 秒
+    const MULTI_WINDOW_CHECK_INTERVAL = 5000;  // 多窗口检测间隔 5 秒
+
+    // Master 最小持有时间（防止并排窗口频繁切换）
+    const MIN_MASTER_HOLD_MS = 3000;
+
+    // 引导弹窗倒计时
+    const GUIDE_COUNTDOWN_MS = 30000;  // 30 秒
+
+    // 内部状态
+    let isMaster = false;
+    let heartbeatTimer = null;
+    let multiWindowCheckTimer = null;
+    let masterClaimTime = 0;           // 成为 Master 的时间戳
+    let guideCountdownTimer = null;    // 引导弹窗倒计时定时器
+    let guideModalElement = null;      // 引导弹窗 DOM 引用
+    let isGuideActive = false;         // 引导弹窗是否激活中
+    let guideCountdownRemaining = 0;   // 倒计时剩余秒数
+    let guideCountdownInterval = null; // 倒计时 setInterval
+    let hasActiveGuideResolve = false;  // 本次多窗口事件是否已处理
+    let lastMultiWindowState = false;  // 上一 tick 的多窗口状态
+
+    // ── 注册表操作 ──
+
+    // 获取注册表
+    function getRegistry() {
+        try {
+            const stored = localStorage.getItem(REGISTRY_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                return parsed.tabs || {};
+            }
+        } catch (e) {
+            console.warn('[B站学习助手] TabManager.getRegistry: 读取失败', e);
+        }
+        return {};
+    }
+
+    // 保存注册表
+    function saveRegistry(tabs) {
+        try {
+            localStorage.setItem(REGISTRY_KEY, JSON.stringify({ tabs }));
+        } catch (e) {
+            console.warn('[B站学习助手] TabManager.saveRegistry: 写入失败', e);
+        }
+    }
+
+    // 注册自己到注册表
+    function registerSelf() {
+        const tabs = getRegistry();
+        tabs[TAB_ID] = {
+            bv: PageMonitor.getCurrentBV() || '',
+            isWhitelisted: false,
+            isStudying: false,
+            lastHeartbeat: Date.now(),
+            windowTitle: document.title,
+            registeredAt: Date.now()
+        };
+        saveRegistry(tabs);
+    }
+
+    // 更新自己的注册信息（主定时器每秒调用）
+    function updateRegistration(data) {
+        const tabs = getRegistry();
+        const myEntry = tabs[TAB_ID];
+        if (myEntry) {
+            Object.assign(myEntry, data, { lastHeartbeat: Date.now() });
+        } else {
+            tabs[TAB_ID] = { ...data, lastHeartbeat: Date.now(), registeredAt: Date.now() };
+        }
+        saveRegistry(tabs);
+    }
+
+    // 注销自己
+    function unregisterSelf() {
+        const tabs = getRegistry();
+        delete tabs[TAB_ID];
+        saveRegistry(tabs);
+    }
+
+    // 清理失联标签页（心跳超时）
+    function cleanStaleTabs() {
+        const tabs = getRegistry();
+        const now = Date.now();
+        let changed = false;
+        for (const tabId in tabs) {
+            if (tabId !== TAB_ID && now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) {
+                delete tabs[tabId];
+                changed = true;
+                console.log('[B站学习助手] TabManager: 清理失联标签页', tabId);
+            }
+        }
+        if (changed) saveRegistry(tabs);
+    }
+
+    // ── Master 选举 ──
+
+    // 尝试成为 Master
+    function claimMaster() {
+        const now = Date.now();
+        try {
+            localStorage.setItem(MASTER_KEY, JSON.stringify({
+                tabId: TAB_ID,
+                heartbeat: now,
+                claimedAt: now
+            }));
+        } catch (e) { /* ignore */ }
+        isMaster = true;
+        masterClaimTime = now;
+        console.log('[B站学习助手] TabManager: 成为主窗口', TAB_ID);
+    }
+
+    // 释放 Master
+    function releaseMaster() {
+        if (isMaster) {
+            try {
+                const stored = localStorage.getItem(MASTER_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    // 只清理自己的标记（避免覆盖其他窗口的新标记）
+                    if (parsed.tabId === TAB_ID) {
+                        localStorage.removeItem(MASTER_KEY);
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            isMaster = false;
+            masterClaimTime = 0;
+            console.log('[B站学习助手] TabManager: 释放主窗口', TAB_ID);
+        }
+    }
+
+    // Master 选举逻辑
+    function elect() {
+        const now = Date.now();
+        try {
+            const stored = localStorage.getItem(MASTER_KEY);
+            if (stored) {
+                const master = JSON.parse(stored);
+                // 如果自己就是 Master
+                if (master.tabId === TAB_ID) {
+                    // 更新心跳
+                    master.heartbeat = now;
+                    localStorage.setItem(MASTER_KEY, JSON.stringify(master));
+                    isMaster = true;
+                    return;
+                }
+                // 检查现有 Master 是否存活
+                if (now - master.heartbeat < HEARTBEAT_TIMEOUT) {
+                    // 其他窗口是 Master 且存活
+                    isMaster = false;
+                    return;
+                }
+                // Master 心跳超时，接管
+                console.log('[B站学习助手] TabManager: 主窗口心跳超时，尝试接管');
+            }
+            // 无 Master 或 Master 超时 → 成为 Master
+            claimMaster();
+        } catch (e) {
+            console.warn('[B站学习助手] TabManager.elect: 选举失败，默认成为主窗口', e);
+            isMaster = true;
+            masterClaimTime = now;
+        }
+    }
+
+    // ── 心跳 ──
+
+    function startHeartbeat() {
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        heartbeatTimer = setInterval(function() {
+            if (isMaster) {
+                // Master 更新心跳
+                try {
+                    const stored = localStorage.getItem(MASTER_KEY);
+                    if (stored) {
+                        const master = JSON.parse(stored);
+                        if (master.tabId === TAB_ID) {
+                            master.heartbeat = Date.now();
+                            localStorage.setItem(MASTER_KEY, JSON.stringify(master));
+                        } else {
+                            // 另一个窗口抢了 Master
+                            isMaster = false;
+                            masterClaimTime = 0;
+                        }
+                    } else {
+                        // Master 标记丢失，重新声明
+                        claimMaster();
+                    }
+                } catch (e) { /* ignore */ }
+            } else {
+                // 非 Master 检查 Master 心跳
+                elect();
+            }
+            // 顺便清理失联标签
+            cleanStaleTabs();
+        }, HEARTBEAT_INTERVAL);
+    }
+
+    // ── 可见性与焦点监听 ──
+
+    function listenForVisibilityChange() {
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // 页面隐藏：如果是 Master 且已持有超过最小持有时间，则释放
+                if (isMaster && Date.now() - masterClaimTime > MIN_MASTER_HOLD_MS) {
+                    releaseMaster();
+                }
+            } else {
+                // 页面可见：尝试接管 Master
+                // 短延迟避免快速切换时的竞态
+                setTimeout(function() {
+                    elect();
+                }, 200);
+            }
+        });
+    }
+
+    function listenForFocus() {
+        window.addEventListener('focus', function() {
+            if (!document.hidden) {
+                // 窗口获得焦点且可见：如果当前不是 Master，尝试抢夺
+                if (!isMaster) {
+                    // 检查当前 Master 的心跳
+                    try {
+                        const stored = localStorage.getItem(MASTER_KEY);
+                        if (stored) {
+                            const master = JSON.parse(stored);
+                            // 如果 Master 心跳超过 1 秒（说明不是并排连续操作），抢夺
+                            if (Date.now() - master.heartbeat > 1000) {
+                                claimMaster();
+                            }
+                        } else {
+                            claimMaster();
+                        }
+                    } catch (e) {
+                        claimMaster();
+                    }
+                }
+            }
+        });
+    }
+
+    function listenForUnload() {
+        window.addEventListener('beforeunload', function() {
+            // 释放 Master
+            releaseMaster();
+            // 注销注册表
+            unregisterSelf();
+        });
+    }
+
+    // ── 多窗口检测 ──
+
+    // 获取活跃标签页数量
+    function getActiveTabCount() {
+        const tabs = getRegistry();
+        const now = Date.now();
+        let count = 0;
+        for (const tabId in tabs) {
+            if (now - tabs[tabId].lastHeartbeat < HEARTBEAT_TIMEOUT) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // 检测是否存在不同类型的窗口（1学+1分）
+    function hasMixedWindowTypes() {
+        const tabs = getRegistry();
+        const now = Date.now();
+        let hasStudy = false;
+        let hasDistraction = false;
+        for (const tabId in tabs) {
+            if (now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) continue;
+            if (tabs[tabId].isWhitelisted) {
+                hasStudy = true;
+            } else {
+                hasDistraction = true;
+            }
+        }
+        return hasStudy && hasDistraction;
+    }
+
+    // 获取当前是否处于多窗口场景
+    function isMultiWindow() {
+        return getActiveTabCount() >= 2;
+    }
+
+    // 多窗口检测定时器
+    function startMultiWindowCheck() {
+        if (multiWindowCheckTimer) clearInterval(multiWindowCheckTimer);
+        multiWindowCheckTimer = setInterval(function() {
+            const multiNow = isMultiWindow();
+            const mixedNow = hasMixedWindowTypes();
+
+            // 检测到多窗口状态变化
+            if (multiNow !== lastMultiWindowState) {
+                console.log('[B站学习助手] TabManager: 多窗口状态变化', multiNow ? '进入多窗口' : '退出多窗口');
+                lastMultiWindowState = multiNow;
+            }
+
+            // 只在"不同类型窗口并存"时触发引导
+            if (multiNow && mixedNow && !isGuideActive && !hasActiveGuideResolve) {
+                console.log('[B站学习助手] TabManager: 检测到不同类型窗口并存，触发引导');
+                triggerMultiWindowGuide();
+            }
+
+            // 如果不再是多窗口，关闭引导
+            if (!multiNow && isGuideActive) {
+                dismissGuide('window_resolved');
+            }
+        }, MULTI_WINDOW_CHECK_INTERVAL);
+    }
+
+    // ── 多窗口引导弹窗 ──
+
+    // 触发多窗口引导
+    function triggerMultiWindowGuide() {
+        hasActiveGuideResolve = true;
+        isGuideActive = true;
+        guideCountdownRemaining = Math.ceil(GUIDE_COUNTDOWN_MS / 1000);
+
+        // 两边都暂停计时
+        _setPaused(true);
+
+        // 判断当前窗口类型
+        const currentBV = PageMonitor.getCurrentBV();
+        const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
+
+        if (isWhitelisted) {
+            // 学习窗口：显示高斯模糊 + 标注文字（不弹弹窗）
+            showStudyWindowOverlay();
+        } else {
+            // 分心窗口：弹出引导弹窗
+            showGuideModal();
+        }
+    }
+
+    // 学习窗口的叠加层（高斯模糊 + 标注）
+    function showStudyWindowOverlay() {
+        // 移除已有的 overlay
+        dismissStudyOverlay();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'bilibili-study-multi-tab-overlay bilibili-study-multi-tab-study-overlay';
+        overlay.innerHTML = `
+            <div class="bilibili-study-multi-tab-study-message">
+                <div class="bilibili-study-multi-tab-study-icon">🖥️</div>
+                <div class="bilibili-study-multi-tab-study-title">检测到多个学习窗口</div>
+                <div class="bilibili-study-multi-tab-study-desc">计时已暂停，请在另一个窗口处理</div>
+                <div class="bilibili-study-multi-tab-study-hint">
+                    另一窗口正在分心，关闭后将自动恢复计时
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        console.log('[B站学习助手] TabManager: 显示学习窗口叠加层');
+    }
+
+    // 移除学习窗口叠加层
+    function dismissStudyOverlay() {
+        const existing = document.querySelector('.bilibili-study-multi-tab-study-overlay');
+        if (existing) existing.remove();
+    }
+
+    // 显示引导弹窗（在分心窗口弹出）
+    function showGuideModal() {
+        // 如果已有弹窗，先移除
+        dismissGuideModalOnly();
+
+        const tabs = getRegistry();
+        const now = Date.now();
+        let studyTabs = [];
+        let distractionTabs = [];
+        for (const tabId in tabs) {
+            if (now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) continue;
+            const tab = tabs[tabId];
+            if (tab.isWhitelisted) {
+                studyTabs.push(tab);
+            } else {
+                distractionTabs.push(tab);
+            }
+        }
+
+        // 当前视频信息
+        const currentBV = PageMonitor.getCurrentBV();
+        const currentTitle = document.title;
+
+        // 构建学习窗口列表
+        let studyListHtml = studyTabs.map(tab => `
+            <div class="bilibili-study-multi-tab-item bilibili-study-multi-tab-item-study">
+                <span class="bilibili-study-multi-tab-item-icon">📚</span>
+                <span class="bilibili-study-multi-tab-item-title">${_escapeHtml(tab.windowTitle || '学习视频')}</span>
+                <span class="bilibili-study-multi-tab-item-badge bilibili-study-multi-tab-badge-study">学习</span>
+            </div>
+        `).join('');
+
+        guideModalElement = document.createElement('div');
+        guideModalElement.className = 'bilibili-study-multi-tab-guide';
+        guideModalElement.innerHTML = `
+            <div class="bilibili-study-multi-tab-guide-backdrop"></div>
+            <div class="bilibili-study-multi-tab-guide-content">
+                <div class="bilibili-study-multi-tab-guide-header">
+                    <span class="bilibili-study-multi-tab-guide-icon">🖥️</span>
+                    <span class="bilibili-study-multi-tab-guide-title">检测到多个学习窗口</span>
+                </div>
+                <div class="bilibili-study-multi-tab-guide-body">
+                    <div class="bilibili-study-multi-tab-guide-desc">
+                        同时打开多个窗口会导致计时不准确，请选择如何处理：
+                    </div>
+                    <div class="bilibili-study-multi-tab-guide-list">
+                        ${studyListHtml}
+                        <div class="bilibili-study-multi-tab-item bilibili-study-multi-tab-item-current">
+                            <span class="bilibili-study-multi-tab-item-icon">🎬</span>
+                            <span class="bilibili-study-multi-tab-item-title">${_escapeHtml(currentTitle || '当前视频')}</span>
+                            <span class="bilibili-study-multi-tab-item-badge bilibili-study-multi-tab-badge-distraction">非学习</span>
+                        </div>
+                    </div>
+                    <div class="bilibili-study-multi-tab-guide-notice">
+                        📌 当前视频已记录在近期播放列表，可稍后观看
+                    </div>
+                    <div class="bilibili-study-multi-tab-guide-whitelist">
+                        <label class="bilibili-study-multi-tab-whitelist-label">
+                            <input type="checkbox" id="bilibili-study-multi-tab-add-whitelist" />
+                            将当前视频添加到学习白名单
+                        </label>
+                    </div>
+                </div>
+                <div class="bilibili-study-multi-tab-guide-footer">
+                    <button class="bilibili-study-multi-tab-btn bilibili-study-multi-tab-btn-primary" id="bilibili-study-multi-tab-btn-close">
+                        关闭本窗口
+                    </button>
+                    <button class="bilibili-study-multi-tab-btn bilibili-study-multi-tab-btn-secondary" id="bilibili-study-multi-tab-btn-keep">
+                        保留本窗口
+                    </button>
+                    <div class="bilibili-study-multi-tab-guide-countdown" id="bilibili-study-multi-tab-countdown">
+                        ⏱️ ${guideCountdownRemaining}秒后未选择，将自动以当前视频窗口为主窗口
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(guideModalElement);
+
+        // 注册到 ModalManager
+        ModalManager.register('multi-tab-guide', ModalManager.LEVELS.MULTI_TAB, guideModalElement);
+
+        // 绑定按钮事件
+        const closeBtn = guideModalElement.querySelector('#bilibili-study-multi-tab-btn-close');
+        const keepBtn = guideModalElement.querySelector('#bilibili-study-multi-tab-btn-keep');
+
+        closeBtn.addEventListener('click', function() {
+            _handleGuideChoice('close');
+        });
+        keepBtn.addEventListener('click', function() {
+            _handleGuideChoice('keep');
+        });
+
+        // 应用当前主题
+        _applyThemeToGuide();
+
+        // 启动倒计时
+        _startGuideCountdown();
+
+        console.log('[B站学习助手] TabManager: 显示多窗口引导弹窗');
+    }
+
+    // 启动倒计时
+    function _startGuideCountdown() {
+        if (guideCountdownInterval) clearInterval(guideCountdownInterval);
+        guideCountdownInterval = setInterval(function() {
+            guideCountdownRemaining--;
+            const countdownEl = document.getElementById('bilibili-study-multi-tab-countdown');
+            if (countdownEl) {
+                countdownEl.textContent = `⏱️ ${guideCountdownRemaining}秒后未选择，将自动以当前视频窗口为主窗口`;
+            }
+            if (guideCountdownRemaining <= 0) {
+                clearInterval(guideCountdownInterval);
+                guideCountdownInterval = null;
+                // 倒计时结束：默认分心窗口成为Master
+                _handleGuideChoice('timeout');
+            }
+        }, 1000);
+    }
+
+    // 处理引导选择
+    function _handleGuideChoice(choice) {
+        // 停止倒计时
+        if (guideCountdownInterval) {
+            clearInterval(guideCountdownInterval);
+            guideCountdownInterval = null;
+        }
+
+        const checkbox = document.getElementById('bilibili-study-multi-tab-add-whitelist');
+        const shouldAddWhitelist = checkbox && checkbox.checked;
+        const currentBV = PageMonitor.getCurrentBV();
+
+        // 如果用户勾选了"添加到白名单"
+        if (shouldAddWhitelist && currentBV) {
+            const config = ConfigManager.get();
+            if (!config.whitelist.find(w => w.bv === currentBV)) {
+                config.whitelist.push({
+                    bv: currentBV,
+                    name: document.title.replace('_哔哩哔哩_bilibili', '').replace('_哔哩哔哩', '').trim() || currentBV
+                });
+                ConfigManager.save(config);
+                console.log('[B站学习助手] TabManager: 已将当前视频添加到白名单', currentBV);
+            }
+        }
+
+        switch (choice) {
+            case 'close':
+                // 用户选择关闭本窗口
+                console.log('[B站学习助手] TabManager: 用户选择关闭当前窗口');
+                // 记录 BV 号
+                if (currentBV) {
+                    HistoryVideoTracker.record(currentBV, document.title, 'distraction', 'multi_window_close');
+                }
+                dismissGuide('user_close');
+                // 尝试关闭窗口（可能被浏览器拦截）
+                window.close();
+                // 如果关闭失败，回退为副窗口模式
+                _becomeSecondary();
+                break;
+
+            case 'keep':
+                // 用户选择保留本窗口（关闭学习窗口）
+                console.log('[B站学习助手] TabManager: 用户选择保留当前窗口');
+                dismissGuide('user_keep');
+                // 当前窗口成为 Master
+                claimMaster();
+                _setPaused(false);
+                break;
+
+            case 'timeout':
+                // 倒计时结束：分心窗口成为 Master，继承干预状态
+                console.log('[B站学习助手] TabManager: 倒计时结束，默认当前视频窗口为主窗口');
+                dismissGuide('timeout');
+                claimMaster();
+                _setPaused(false);
+                break;
+        }
+    }
+
+    // 成为副窗口
+    function _becomeSecondary() {
+        isMaster = false;
+        _setPaused(true);
+        // 更新浮窗状态
+        _updateFloatingWindowStatus();
+    }
+
+    // 关闭引导弹窗（不含叠加层）
+    function dismissGuideModalOnly() {
+        if (guideCountdownInterval) {
+            clearInterval(guideCountdownInterval);
+            guideCountdownInterval = null;
+        }
+        if (guideModalElement) {
+            ModalManager.dismiss('multi-tab-guide');
+            guideModalElement = null;
+        }
+    }
+
+    // 关闭引导（弹窗+叠加层+暂停状态）
+    function dismissGuide(reason) {
+        dismissGuideModalOnly();
+        dismissStudyOverlay();
+
+        isGuideActive = false;
+        hasActiveGuideResolve = false;
+
+        // 如果不再是多窗口，恢复计时
+        if (!isMultiWindow()) {
+            _setPaused(false);
+            console.log('[B站学习助手] TabManager: 多窗口已解决，恢复计时, reason=', reason);
+        }
+
+        // 更新浮窗
+        _updateFloatingWindowStatus();
+    }
+
+    // ── 暂停控制 ──
+
+    let _isPaused = false;
+
+    function _setPaused(paused) {
+        _isPaused = paused;
+        // 通知主定时器
+        if (window.__bilibiliStudyAppState) {
+            window.__bilibiliStudyAppState.multiWindowPaused = paused;
+        }
+        // 更新浮窗显示
+        _updateFloatingWindowStatus();
+    }
+
+    function isPaused() {
+        return _isPaused;
+    }
+
+    // ── 浮窗状态更新 ──
+
+    function _updateFloatingWindowStatus() {
+        const fw = document.getElementById('bilibili-study-floating-window');
+        if (!fw) return;
+
+        if (_isPaused && !isMaster) {
+            // 副窗口 + 暂停中
+            fw.classList.add('bilibili-study-floating-secondary');
+        } else {
+            fw.classList.remove('bilibili-study-floating-secondary');
+        }
+
+        if (_isPaused && isMaster) {
+            // Master 但暂停中（多窗口协商期间）
+            fw.classList.add('bilibili-study-floating-negotiating');
+        } else {
+            fw.classList.remove('bilibili-study-floating-negotiating');
+        }
+    }
+
+    // ── 主题适配 ──
+
+    function _applyThemeToGuide() {
+        if (!guideModalElement) return;
+        const isDark = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
+                       document.body.classList.contains('bilibili-study-dark-mode');
+        if (isDark) {
+            guideModalElement.classList.add('bilibili-study-dark-mode');
+        }
+    }
+
+    // ── 工具函数 ──
+
+    function _escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ── 初始化 ──
+
+    function init() {
+        // 1. 注册自己
+        registerSelf();
+
+        // 2. Master 选举
+        elect();
+
+        // 3. 启动心跳
+        startHeartbeat();
+
+        // 4. 启动多窗口检测
+        startMultiWindowCheck();
+
+        // 5. 监听可见性变化
+        listenForVisibilityChange();
+
+        // 6. 监听焦点
+        listenForFocus();
+
+        // 7. 监听窗口关闭
+        listenForUnload();
+
+        console.log('[B站学习助手] TabManager.init: 初始化完成', {
+            tabId: TAB_ID,
+            isMaster: isMaster
+        });
+    }
+
+    return {
+        TAB_ID,
+        init,
+        isMaster: function() { return isMaster; },
+        isPaused,
+        isMultiWindow,
+        hasMixedWindowTypes,
+        getRegistry,
+        getActiveTabCount,
+        updateRegistration,
+        claimMaster,
+        releaseMaster,
+        dismissGuide,
+        isGuideActive: function() { return isGuideActive; }
+    };
+})();
+
+// ==========================================
 // HistoryVideoTracker Module (v1.2.3 新增)
 // ==========================================
 // 记录用户观看/离开的所有视频 BV 号，含 reason/leftAt/title
@@ -2632,7 +3707,30 @@ const FloatingWindow = (function() {
     function updateStatus(status) {
         if (!element) return;
 
-        const { isStudying, stage, studyTime, distractionTime } = status;
+        const { isStudying, stage, studyTime, distractionTime, isMaster: isMasterTab, isPaused: isPausedTab } = status;
+
+        // v1.2.6: 多窗口暂停状态
+        if (isPausedTab) {
+            element.style.backgroundColor = 'rgba(128, 128, 128, 0.7)';
+            element.innerHTML = `
+                <span class="bilibili-study-status-text">⏸️ 计时暂停</span>
+                <span class="bilibili-study-time-display">多窗口协商中</span>
+            `;
+            return;
+        }
+
+        // v1.2.6: 非 Master 标识
+        if (isMasterTab === false) {
+            // 副窗口
+            element.style.backgroundColor = isStudying
+                ? 'rgba(70, 130, 180, 0.7)'    // 钢蓝色：副窗口学习中
+                : 'rgba(128, 128, 128, 0.7)';   // 灰色：副窗口分心
+            element.innerHTML = `
+                <span class="bilibili-study-status-text">${isStudying ? '🔵 副窗口' : '🔵 已暂停'}</span>
+                <span class="bilibili-study-time-display">${isStudying ? '学习中' : '已离开学习状态'}</span>
+            `;
+            return;
+        }
 
         if (isStudying) {
             // Green background for studying
@@ -4536,7 +5634,8 @@ const ModalManager = (function() {
         SETTINGS:   3,  // 设置面板
         CONFIRM:    4,  // 确认弹窗 / 添加白名单弹窗
         WORD:       5,  // 单词验证弹窗
-        AGGRESSIVE: 6   // 强拦截全屏遮罩（v1.3.0 预留）
+        AGGRESSIVE: 6,  // 强拦截全屏遮罩（v1.3.0 预留）
+        MULTI_TAB:  7   // 多窗口引导弹窗（v1.2.6）
     };
 
     // z-index 基数
@@ -5612,7 +6711,8 @@ const InterventionController = (function() {
         currentStage: 0,
         distractionStartTime: null,
         isStudying: true,
-        lastDistractionCount: 0
+        lastDistractionCount: 0,
+        multiWindowPaused: false
     };
     // 同时暴露到真实 window（控制台可调试），需要 unsafeWindow
     try {
@@ -5700,6 +6800,32 @@ const InterventionController = (function() {
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
 
+        // ── v1.2.6: 更新 TabManager 注册信息 ──
+        TabManager.updateRegistration({
+            bv: currentBV || '',
+            isWhitelisted: isWhitelisted,
+            isStudying: isWhitelisted && isStudyTime,
+            windowTitle: document.title,
+        });
+
+        // ── v1.2.6: 多窗口暂停检查 ──
+        // 如果 TabManager 暂停了计时（多窗口协商中），跳过计时和干预
+        if (TabManager.isPaused()) {
+            // 仍然更新浮窗状态（显示暂停状态）
+            if (FloatingWindow.create()) {
+                const todayStats = StatisticsTracker.getTodayStats();
+                FloatingWindow.updateStatus({
+                    isStudying: state.isStudying,
+                    stage: state.currentStage,
+                    studyTime: todayStats.studyTime,
+                    distractionTime: todayStats.distractionTime,
+                    isMaster: TabManager.isMaster(),
+                    isPaused: true
+                });
+            }
+            return;
+        }
+
         // ── v1.2.3: 全局状态重置策略检查 ──
         // 在干预逻辑之前执行，确保时段结束时及时重置
         GlobalStateManager.checkAndReset(isStudyTime);
@@ -5712,32 +6838,46 @@ const InterventionController = (function() {
                 isVideoPage, isPageActive, isStudyTime, isWhitelisted,
                 currentBV, currentStage: state.currentStage, url: window.location.href,
                 resetStrategy: ConfigManager.get().resetStrategy,
+                isMaster: TabManager.isMaster(),
+                isPaused: TabManager.isPaused(),
             });
         }
 
-        // Update statistics based on current state
-        if (isVideoPage && isPageActive && isStudyTime) {
-            // 更新活动时间（interval策略用）
-            GlobalStateManager.touchActivity();
+        // ── v1.2.6: Master 分支 ──
+        if (TabManager.isMaster()) {
+            // ═══ Master 窗口：正常计时 + 干预 ═══
 
-            if (isWhitelisted) {
-                // Studying on whitelisted video
-                state.isStudying = true;
-                StatisticsTracker.addStudyTime(1);
-                // 累加学习时间（duration策略用）
-                GlobalStateManager.addStudySeconds(1);
-            } else {
-                // Distracted on non-whitelisted video
-                state.isStudying = false;
-                StatisticsTracker.addDistractionTime(1);
+            // Update statistics based on current state
+            if (isVideoPage && isPageActive && isStudyTime) {
+                // 更新活动时间（interval策略用）
+                GlobalStateManager.touchActivity();
+
+                if (isWhitelisted) {
+                    // Studying on whitelisted video
+                    state.isStudying = true;
+                    StatisticsTracker.addStudyTime(1);
+                    // 累加学习时间（duration策略用）
+                    GlobalStateManager.addStudySeconds(1);
+                } else {
+                    // Distracted on non-whitelisted video
+                    state.isStudying = false;
+                    StatisticsTracker.addDistractionTime(1);
+                }
+
+                // ── v1.2.3: 同步 appState 到全局状态 ──
+                GlobalStateManager.syncFromAppState();
             }
 
-            // ── v1.2.3: 同步 appState 到全局状态 ──
-            GlobalStateManager.syncFromAppState();
-        }
+            // Run intervention check
+            InterventionController.check();
 
-        // Run intervention check
-        InterventionController.check();
+        } else {
+            // ═══ 非 Master 窗口：只更新本地状态，不计时、不干预 ═══
+            if (isVideoPage && isPageActive && isStudyTime) {
+                state.isStudying = isWhitelisted;
+            }
+            console.log('[B站学习助手] 主定时器: 非 Master 窗口，跳过计时和干预');
+        }
 
         // Update floating window status
         if (FloatingWindow.create()) {
@@ -5746,7 +6886,9 @@ const InterventionController = (function() {
                 isStudying: state.isStudying,
                 stage: state.currentStage,
                 studyTime: todayStats.studyTime,
-                distractionTime: todayStats.distractionTime
+                distractionTime: todayStats.distractionTime,
+                isMaster: TabManager.isMaster(),
+                isPaused: false
             });
         }
     }, 1000);
@@ -5825,6 +6967,15 @@ const InterventionController = (function() {
     // ── v1.2.3: 初始化 GlobalStateManager ──
     // 在所有模块初始化后调用，从 localStorage 加载全局状态
     GlobalStateManager.init();
+
+    // ── v1.2.6: 初始化 TabManager ──
+    // Master选举 + 心跳 + 多窗口检测
+    try {
+        TabManager.init();
+        console.log('[B站学习助手] init: TabManager.init 完成');
+    } catch(e) {
+        console.error('[B站学习助手] init: TabManager.init 失败!', e);
+    }
 
     // ── v1.2.4: 恢复视觉干预效果 ──
     // 全局状态同步了 currentStage 但 DOM 上的 CSS class 不会自动恢复
