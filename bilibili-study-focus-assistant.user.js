@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.6
+// @version      1.2.6.1
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -1725,6 +1725,50 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-countdown {
         color: #777;
     }
+
+    /* v1.2.6.1: 补全暗色适配 */
+
+    /* overlay 背景（学习窗口叠加层）*/
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-overlay {
+        background: rgba(0, 0, 0, 0.65);
+    }
+
+    /* 引导弹窗 backdrop 暗色加深 */
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-backdrop {
+        background: rgba(0, 0, 0, 0.65);
+    }
+
+    /* badge 学习标签暗色 */
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-badge-study {
+        background: rgba(34, 139, 34, 0.15);
+        color: #4ade80;
+    }
+
+    /* badge 非学习标签暗色 */
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-badge-distraction {
+        background: rgba(220, 20, 60, 0.15);
+        color: #f87171;
+    }
+
+    /* btn-primary 暗色（红色太刺眼，改为偏暗红）*/
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-btn-primary {
+        background: #b91c1c;
+        color: #fca5a5;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-btn-primary:hover {
+        background: #991b1b;
+    }
+
+    /* checkbox 暗色适配 */
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-whitelist-label input[type="checkbox"] {
+        accent-color: #60a5fa;
+    }
+
+    /* guide-icon 暗色下微调 */
+    .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-icon {
+        filter: brightness(1.1);
+    }
 `;
 
 // Inject CSS
@@ -2491,6 +2535,7 @@ const TabManager = (function() {
 
     // 引导弹窗倒计时
     const GUIDE_COUNTDOWN_MS = 30000;  // 30 秒
+    const GUIDE_COOLDOWN_MS = 60000;   // 引导弹窗冷却期 60 秒（用户做出选择后不再重复触发）
 
     // 内部状态
     let isMaster = false;
@@ -2502,7 +2547,7 @@ const TabManager = (function() {
     let isGuideActive = false;         // 引导弹窗是否激活中
     let guideCountdownRemaining = 0;   // 倒计时剩余秒数
     let guideCountdownInterval = null; // 倒计时 setInterval
-    let hasActiveGuideResolve = false;  // 本次多窗口事件是否已处理
+    let lastGuideResolvedAt = 0;       // 上次用户处理引导弹窗的时间戳（冷却期用）
     let lastMultiWindowState = false;  // 上一 tick 的多窗口状态
 
     // ── 注册表操作 ──
@@ -2545,6 +2590,7 @@ const TabManager = (function() {
     }
 
     // 更新自己的注册信息（主定时器每秒调用）
+    let _lastRegistrationLogTime = 0;
     function updateRegistration(data) {
         const tabs = getRegistry();
         const myEntry = tabs[TAB_ID];
@@ -2554,6 +2600,22 @@ const TabManager = (function() {
             tabs[TAB_ID] = { ...data, lastHeartbeat: Date.now(), registeredAt: Date.now() };
         }
         saveRegistry(tabs);
+
+        // 节流日志：每30秒输出一次注册状态
+        const now = Date.now();
+        if (now - _lastRegistrationLogTime > 30000) {
+            _lastRegistrationLogTime = now;
+            const activeCount = getActiveTabCount();
+            console.log('[B站学习助手] TabManager: 注册状态', {
+                tabId: TAB_ID.substring(0, 12) + '...',
+                bv: (data.bv || '').substring(0, 10) + '...',
+                isWhitelisted: data.isWhitelisted,
+                isMaster: isMaster,
+                activeTabs: activeCount,
+                isPaused: _isPaused,
+                documentHidden: document.hidden
+            });
+        }
     }
 
     // 注销自己
@@ -2687,10 +2749,17 @@ const TabManager = (function() {
             if (document.hidden) {
                 // 页面隐藏：如果是 Master 且已持有超过最小持有时间，则释放
                 if (isMaster && Date.now() - masterClaimTime > MIN_MASTER_HOLD_MS) {
+                    console.log('[B站学习助手] TabManager: 页面隐藏，释放主窗口', TAB_ID);
                     releaseMaster();
+                } else {
+                    console.log('[B站学习助手] TabManager: 页面隐藏，保持当前状态', {
+                        isMaster: isMaster,
+                        holdTime: Date.now() - masterClaimTime + 'ms'
+                    });
                 }
             } else {
                 // 页面可见：尝试接管 Master
+                console.log('[B站学习助手] TabManager: 页面可见，尝试选举');
                 // 短延迟避免快速切换时的竞态
                 setTimeout(function() {
                     elect();
@@ -2704,6 +2773,7 @@ const TabManager = (function() {
             if (!document.hidden) {
                 // 窗口获得焦点且可见：如果当前不是 Master，尝试抢夺
                 if (!isMaster) {
+                    console.log('[B站学习助手] TabManager: 窗口获得焦点，尝试抢夺主窗口');
                     // 检查当前 Master 的心跳
                     try {
                         const stored = localStorage.getItem(MASTER_KEY);
@@ -2712,6 +2782,10 @@ const TabManager = (function() {
                             // 如果 Master 心跳超过 1 秒（说明不是并排连续操作），抢夺
                             if (Date.now() - master.heartbeat > 1000) {
                                 claimMaster();
+                            } else {
+                                console.log('[B站学习助手] TabManager: 当前主窗口心跳新鲜，不抢夺', {
+                                    masterAge: Date.now() - master.heartbeat + 'ms'
+                                });
                             }
                         } else {
                             claimMaster();
@@ -2754,13 +2828,23 @@ const TabManager = (function() {
         const now = Date.now();
         let hasStudy = false;
         let hasDistraction = false;
+        const studyList = [];
+        const distractList = [];
         for (const tabId in tabs) {
             if (now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) continue;
             if (tabs[tabId].isWhitelisted) {
                 hasStudy = true;
+                studyList.push(tabId.substring(0, 12) + '...');
             } else {
                 hasDistraction = true;
+                distractList.push(tabId.substring(0, 12) + '...');
             }
+        }
+        if (hasStudy && hasDistraction) {
+            console.log('[B站学习助手] TabManager: hasMixedWindowTypes=true', {
+                studyTabs: studyList,
+                distractionTabs: distractList
+            });
         }
         return hasStudy && hasDistraction;
     }
@@ -2776,16 +2860,31 @@ const TabManager = (function() {
         multiWindowCheckTimer = setInterval(function() {
             const multiNow = isMultiWindow();
             const mixedNow = hasMixedWindowTypes();
+            const now = Date.now();
+            const inCooldown = (now - lastGuideResolvedAt) < GUIDE_COOLDOWN_MS;
 
             // 检测到多窗口状态变化
             if (multiNow !== lastMultiWindowState) {
-                console.log('[B站学习助手] TabManager: 多窗口状态变化', multiNow ? '进入多窗口' : '退出多窗口');
+                console.log('[B站学习助手] TabManager: 多窗口状态变化', multiNow ? '进入多窗口' : '退出多窗口', {
+                    activeTabs: _getActiveTabDetails(),
+                    mixedTypes: mixedNow,
+                    inCooldown: inCooldown,
+                    documentHidden: document.hidden
+                });
                 lastMultiWindowState = multiNow;
             }
 
             // 只在"不同类型窗口并存"时触发引导
-            if (multiNow && mixedNow && !isGuideActive && !hasActiveGuideResolve) {
-                console.log('[B站学习助手] TabManager: 检测到不同类型窗口并存，触发引导');
+            // Bug修复：当前窗口在后台时不弹引导（用户看不到，反而打断前台窗口）
+            // Bug修复：冷却期内不再重复触发
+            if (multiNow && mixedNow && !isGuideActive && !inCooldown && !document.hidden) {
+                console.log('[B站学习助手] TabManager: 检测到不同类型窗口并存，触发引导', {
+                    activeTabs: _getActiveTabDetails(),
+                    currentTab: TAB_ID,
+                    currentBV: PageMonitor.getCurrentBV(),
+                    isWhitelisted: ConfigManager.isWhitelisted(PageMonitor.getCurrentBV()),
+                    documentHidden: document.hidden
+                });
                 triggerMultiWindowGuide();
             }
 
@@ -2800,7 +2899,6 @@ const TabManager = (function() {
 
     // 触发多窗口引导
     function triggerMultiWindowGuide() {
-        hasActiveGuideResolve = true;
         isGuideActive = true;
         guideCountdownRemaining = Math.ceil(GUIDE_COUNTDOWN_MS / 1000);
 
@@ -2810,6 +2908,13 @@ const TabManager = (function() {
         // 判断当前窗口类型
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
+
+        console.log('[B站学习助手] TabManager: triggerMultiWindowGuide', {
+            currentTab: TAB_ID,
+            currentBV: currentBV,
+            isWhitelisted: isWhitelisted,
+            activeTabs: _getActiveTabDetails()
+        });
 
         if (isWhitelisted) {
             // 学习窗口：显示高斯模糊 + 标注文字（不弹弹窗）
@@ -2838,6 +2943,14 @@ const TabManager = (function() {
             </div>
         `;
         document.body.appendChild(overlay);
+
+        // 暗色适配
+        const isDark = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
+                       document.body.classList.contains('bilibili-study-dark-mode');
+        if (isDark) {
+            overlay.classList.add('bilibili-study-dark-mode');
+        }
+
         console.log('[B站学习助手] TabManager: 显示学习窗口叠加层');
     }
 
@@ -2969,6 +3082,13 @@ const TabManager = (function() {
 
     // 处理引导选择
     function _handleGuideChoice(choice) {
+        console.log('[B站学习助手] TabManager: _handleGuideChoice', choice, {
+            isGuideActive: isGuideActive,
+            isMaster: isMaster,
+            isPaused: _isPaused,
+            currentBV: PageMonitor.getCurrentBV()
+        });
+
         // 停止倒计时
         if (guideCountdownInterval) {
             clearInterval(guideCountdownInterval);
@@ -2978,17 +3098,24 @@ const TabManager = (function() {
         const checkbox = document.getElementById('bilibili-study-multi-tab-add-whitelist');
         const shouldAddWhitelist = checkbox && checkbox.checked;
         const currentBV = PageMonitor.getCurrentBV();
+        let whitelistAdded = false;
 
         // 如果用户勾选了"添加到白名单"
         if (shouldAddWhitelist && currentBV) {
             const config = ConfigManager.get();
             if (!config.whitelist.find(w => w.bv === currentBV)) {
+                const videoName = document.title.replace('_哔哩哔哩_bilibili', '').replace('_哔哩哔哩', '').trim() || currentBV;
                 config.whitelist.push({
                     bv: currentBV,
-                    name: document.title.replace('_哔哩哔哩_bilibili', '').replace('_哔哩哔哩', '').trim() || currentBV
+                    name: videoName
                 });
                 ConfigManager.save(config);
-                console.log('[B站学习助手] TabManager: 已将当前视频添加到白名单', currentBV);
+                whitelistAdded = true;
+                console.log('[B站学习助手] TabManager: 已将当前视频添加到白名单', currentBV, videoName);
+                // Bug修复：白名单添加成功后给用户反馈
+                _showGuideToast('✅ 已将「' + videoName + '」添加到学习白名单');
+            } else {
+                console.log('[B站学习助手] TabManager: 当前视频已在白名单中', currentBV);
             }
         }
 
@@ -3008,12 +3135,23 @@ const TabManager = (function() {
                 break;
 
             case 'keep':
-                // 用户选择保留本窗口（关闭学习窗口）
-                console.log('[B站学习助手] TabManager: 用户选择保留当前窗口');
+                // 用户选择保留本窗口
+                console.log('[B站学习助手] TabManager: 用户选择保留当前窗口', {
+                    whitelistAdded: whitelistAdded,
+                    willBeMaster: true
+                });
                 dismissGuide('user_keep');
                 // 当前窗口成为 Master
                 claimMaster();
                 _setPaused(false);
+                // 如果添加了白名单，重置干预状态（当前视频已变为学习视频）
+                if (whitelistAdded && window.__bilibiliStudyAppState) {
+                    const state = window.__bilibiliStudyAppState;
+                    state.currentStage = 0;
+                    state.distractionStartTime = null;
+                    state.isStudying = true;
+                    console.log('[B站学习助手] TabManager: 白名单添加后重置干预状态');
+                }
                 break;
 
             case 'timeout':
@@ -3052,7 +3190,15 @@ const TabManager = (function() {
         dismissStudyOverlay();
 
         isGuideActive = false;
-        hasActiveGuideResolve = false;
+        // Bug修复：记录冷却时间而非简单重置标志
+        // 用户做出选择后，冷却期内不再重复触发引导弹窗
+        lastGuideResolvedAt = Date.now();
+
+        console.log('[B站学习助手] TabManager: 引导弹窗关闭, reason=', reason, {
+            isMultiWindow: isMultiWindow(),
+            hasMixedTypes: hasMixedWindowTypes(),
+            cooldownUntil: new Date(lastGuideResolvedAt + GUIDE_COOLDOWN_MS).toLocaleTimeString()
+        });
 
         // 如果不再是多窗口，恢复计时
         if (!isMultiWindow()) {
@@ -3120,6 +3266,50 @@ const TabManager = (function() {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    // 获取活跃标签页的详细信息（用于调试日志）
+    function _getActiveTabDetails() {
+        const tabs = getRegistry();
+        const now = Date.now();
+        const details = [];
+        for (const tabId in tabs) {
+            const tab = tabs[tabId];
+            const age = now - tab.lastHeartbeat;
+            details.push({
+                id: tabId.substring(0, 15) + '...',
+                bv: (tab.bv || '').substring(0, 10) + '...',
+                isWhitelisted: tab.isWhitelisted,
+                age: age + 'ms',
+                stale: age > HEARTBEAT_TIMEOUT
+            });
+        }
+        return details;
+    }
+
+    // 在引导弹窗场景中显示轻量 Toast 反馈
+    function _showGuideToast(message) {
+        // 复用已有的 Toast 逻辑（如果存在），否则创建简单的临时 Toast
+        let toast = document.getElementById('bilibili-study-guide-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'bilibili-study-guide-toast';
+            toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+                'padding:10px 20px;border-radius:10px;font-size:14px;z-index:1000010;' +
+                'background:rgba(34,139,34,0.9);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.3);' +
+                'transition:opacity 0.3s;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = '1';
+
+        // 3秒后自动消失
+        setTimeout(function() {
+            if (toast) toast.style.opacity = '0';
+            setTimeout(function() {
+                if (toast && toast.parentNode) toast.remove();
+            }, 300);
+        }, 3000);
     }
 
     // ── 初始化 ──
