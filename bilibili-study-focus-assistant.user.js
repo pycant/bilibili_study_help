@@ -5943,6 +5943,7 @@ const DetailPanel = (function() {
             const levelRadio = settingsElement?.querySelector('input[name="interventionLevel"]:checked');
             const visualRadio = settingsElement?.querySelector('input[name="visualEffectLevel"]:checked');
             const strategyRadio = settingsElement?.querySelector('input[name="resetStrategy"]:checked');
+            const autoNavRadio = settingsElement?.querySelector('input[name="autoNavigate"]:checked');
 
             const newLevel = levelRadio ? levelRadio.value : null;
             const newVisual = visualRadio ? visualRadio.value : null;
@@ -5977,6 +5978,15 @@ const DetailPanel = (function() {
                 const intv = parseInt(intervalInput.value) || 30;
                 if (intv !== config.resetInterval) {
                     ConfigManager.save({ resetInterval: Math.max(5, Math.min(120, intv)) });
+                    hasChanges = true;
+                }
+            }
+
+            // v1.3.0: 保存自动导航设置
+            if (autoNavRadio) {
+                const newAutoNav = autoNavRadio.value === 'true';
+                if (newAutoNav !== config.autoNavigate) {
+                    ConfigManager.save({ autoNavigate: newAutoNav });
                     hasChanges = true;
                 }
             }
@@ -7615,211 +7625,6 @@ const InterventionController = (function() {
         currentWord = null;
         revealedIndices = new Set();
         wordRevealTime = 0;
-    }
-
-    // ── v1.3.0 P0: 自动导航到学习视频 ──
-    function navigateToStudyVideo(options) {
-        const opts = options || {};
-        const whitelist = ConfigManager.getWhitelistArray();
-        if (!whitelist || whitelist.length === 0) return;
-
-        const targetBV = ConfigManager.getDefaultReturnBV();
-        if (!targetBV) return;
-
-        // 跳转前记录离开
-        const currentBV = PageMonitor.getCurrentBV();
-        if (currentBV) {
-            HistoryVideoTracker.record(currentBV, document.title, 'distraction', 'intervention');
-        }
-
-        console.log('[B站学习助手] navigateToStudyVideo: 自动跳转到', targetBV, 'reason:', opts.reason || 'distraction');
-        DebugTelemetry.logIntervention('auto_navigate', { targetBV, reason: opts.reason || 'distraction' });
-        window.location.href = `https://www.bilibili.com/video/${targetBV}`;
-    }
-
-    // ── v1.3.0 P0: 自动导航倒计时 Toast ──
-    function showAutoNavigateToast() {
-        const config = ConfigManager.get();
-        if (!config.autoNavigate) return;
-
-        const whitelist = ConfigManager.getWhitelistArray();
-        if (!whitelist || whitelist.length === 0) return;
-
-        // 移除已有的导航 Toast
-        const existing = document.getElementById('bilibili-study-auto-nav-toast');
-        if (existing) existing.remove();
-
-        const isDark = DetailPanel.getCurrentTheme() === 'dark';
-        const bg = isDark ? 'rgba(30,35,45,0.97)' : 'rgba(255,255,255,0.97)';
-        const textColor = isDark ? '#f1f5f9' : '#1e293b';
-        const btnBg = isDark ? 'rgba(96,165,250,0.2)' : 'rgba(59,130,246,0.1)';
-        const btnColor = isDark ? '#60a5fa' : '#3b82f6';
-        const borderColor = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(59,130,246,0.2)';
-
-        let countdown = 3;
-        let cancelled = false;
-        let timer = null;
-
-        const targetBV = ConfigManager.getDefaultReturnBV();
-        const toast = document.createElement('div');
-        toast.id = 'bilibili-study-auto-nav-toast';
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000001;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            animation: bilibili-study-slide-up 0.25s ease-out;
-        `;
-        toast.innerHTML = `
-            <div style="
-                display: flex; align-items: center; gap: 12px;
-                background: ${bg};
-                border: 1px solid ${borderColor};
-                border-radius: 12px;
-                padding: 12px 18px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-                backdrop-filter: blur(12px);
-                color: ${textColor};
-                font-size: 14px;
-            ">
-                <span style="font-weight: 600;">⏰ ${countdown}s 后自动返回学习视频</span>
-                <button id="bilibili-study-nav-cancel" style="
-                    background: ${btnBg};
-                    color: ${btnColor};
-                    border: 1px solid ${borderColor};
-                    border-radius: 6px;
-                    padding: 6px 14px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    font-weight: 500;
-                    transition: all 0.15s;
-                ">取消</button>
-            </div>
-        `;
-
-        document.body.appendChild(toast);
-
-        // 取消按钮事件
-        document.getElementById('bilibili-study-nav-cancel').addEventListener('click', function() {
-            cancelled = true;
-            if (timer) clearTimeout(timer);
-            if (toast.parentNode) toast.remove();
-            console.log('[B站学习助手] auto-navigate: 用户取消导航');
-        });
-
-        // 倒计时
-        function tick() {
-            if (cancelled) return;
-            countdown--;
-            const countSpan = toast.querySelector('span');
-            if (countSpan) countSpan.textContent = `⏰ ${countdown}s 后自动返回学习视频`;
-            if (countdown <= 0) {
-                toast.remove();
-                navigateToStudyVideo({ reason: 'auto_navigate' });
-            } else {
-                timer = setTimeout(tick, 1000);
-            }
-        }
-        timer = setTimeout(tick, 1000);
-    }
-
-    // ── v1.3.0 P2: 强拦截全屏遮罩 ──
-    function showAggressiveIntervention() {
-        if (modalState !== MODAL_STATES.NONE) {
-            console.log('[B站学习助手] showAggressiveIntervention: 跳过，当前弹窗状态=', modalState);
-            return;
-        }
-        console.log('[B站学习助手] showAggressiveIntervention: 显示强拦截全屏遮罩');
-        modalState = MODAL_STATES.AGGRESSIVE;
-
-        const isDark = DetailPanel.getCurrentTheme() === 'dark';
-        const bg = isDark ? 'rgba(0,0,0,0.92)' : 'rgba(0,0,0,0.88)';
-        const textColor = isDark ? '#f1f5f9' : '#ffffff';
-        const btnColor = isDark ? '#60a5fa' : '#3b82f6';
-
-        const state = window.__bilibiliStudyAppState;
-        const distractionDuration = state && state.distractionStartTime
-            ? Math.floor((Date.now() - state.distractionStartTime) / 1000)
-            : 0;
-        const minutes = Math.floor(distractionDuration / 60);
-        const seconds = distractionDuration % 60;
-
-        let countdown = 10;
-        let cancelled = false;
-        let timer = null;
-
-        const modal = document.createElement('div');
-        modal.className = 'bilibili-study-modal-overlay';
-        modal.id = 'bilibili-study-aggressive-modal';
-        modal.style.background = bg;
-        modal.style.zIndex = '1000006';
-        modal.innerHTML = `
-            <div class="bilibili-study-modal" style="
-                max-width: 480px;
-                background: ${isDark ? 'rgba(30,35,45,0.97)' : 'rgba(255,255,255,0.12)'};
-                border: 1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.2)'};
-                text-align: center;
-                padding: 30px;
-            ">
-                <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
-                <h2 style="color: ${textColor}; margin: 0 0 10px 0; font-size: 22px;">你已分心超过 ${minutes} 分钟</h2>
-                <p style="color: ${textColor}; opacity: 0.7; font-size: 16px; margin: 0 0 20px 0;">
-                    即将在 <strong id="bilibili-study-aggressive-countdown" style="color: ${btnColor}; font-size: 20px;">${countdown}</strong> 秒后跳转回学习视频
-                </p>
-                <div class="bilibili-study-action-buttons" style="justify-content: center; gap: 12px;">
-                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-aggressive-jump"
-                            style="background: ${btnColor}; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer;">
-                        立即跳转
-                    </button>
-                    <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-aggressive-delay"
-                            style="background: transparent; color: ${textColor}; border: 1px solid rgba(255,255,255,0.3); padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer;">
-                        再答一题争取时间
-                    </button>
-                </div>
-            </div>
-        `;
-
-        getModalContainer().appendChild(modal);
-        if (isDark) modal.classList.add('bilibili-study-dark-mode');
-
-        ModalManager.register('aggressive-modal', ModalManager.LEVELS.AGGRESSIVE, modal);
-
-        // 立即跳转
-        document.getElementById('bilibili-study-aggressive-jump').addEventListener('click', function() {
-            cancelled = true;
-            if (timer) clearTimeout(timer);
-            closeCurrentModal();
-            navigateToStudyVideo({ reason: 'aggressive_immediate' });
-        });
-
-        // 再答一题（延迟）
-        document.getElementById('bilibili-study-aggressive-delay').addEventListener('click', function() {
-            cancelled = true;
-            if (timer) clearTimeout(timer);
-            ModalManager.dismiss('aggressive-modal');
-            modalState = MODAL_STATES.NONE;
-            // 弹出单词验证弹窗
-            showWordVerifierModal();
-        });
-
-        // 倒计时
-        function tick() {
-            if (cancelled) return;
-            countdown--;
-            const countEl = document.getElementById('bilibili-study-aggressive-countdown');
-            if (countEl) countEl.textContent = countdown;
-            if (countdown <= 0) {
-                closeCurrentModal();
-                navigateToStudyVideo({ reason: 'aggressive_timeout' });
-            } else {
-                timer = setTimeout(tick, 1000);
-            }
-        }
-        timer = setTimeout(tick, 1000);
-
-        DebugTelemetry.logIntervention('aggressive', { distractionDuration, countdown: 10 });
     }
 
     // Track page visibility for accurate timing
