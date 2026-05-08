@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.6.2
+// @version      1.2.7
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -1951,7 +1951,11 @@ const USER_CONFIG = {
     // 'light'   - 轻度：grayscale最高40%, opacity最低0.85
     // 'medium'  - 中度：grayscale最高60%, opacity最低0.75
     // 'heavy'   - 重度：grayscale最高80%, opacity最低0.6（默认，等同当前效果）
-    visualEffectLevel: 'heavy'
+    visualEffectLevel: 'heavy',
+
+    // P0: 自动导航到学习视频（v1.3.0 新增）
+    // 关闭分心弹窗后显示3秒倒计时Toast，结束后自动跳转到白名单视频
+    autoNavigate: true
 };
 
 // ==========================================
@@ -1992,6 +1996,8 @@ const ConfigManager = (function() {
                     // 干预等级 & 视觉效果强度（v1.2.4 新增）
                     interventionLevel: parsed.interventionLevel || USER_CONFIG.interventionLevel,
                     visualEffectLevel: parsed.visualEffectLevel || USER_CONFIG.visualEffectLevel,
+                    // P0: 自动导航（v1.3.0 新增）
+                    autoNavigate: parsed.autoNavigate !== undefined ? parsed.autoNavigate : USER_CONFIG.autoNavigate,
                 };
             } else {
                 currentConfig = { ...USER_CONFIG };
@@ -2550,6 +2556,7 @@ const TabManager = (function() {
     let lastGuideResolvedAt = 0;       // 上次用户处理引导弹窗的时间戳（冷却期用）
     let lastMultiWindowState = false;  // 上一 tick 的多窗口状态
     let _mixedWindowStableCount = 0;   // 【v1.2.6.2】连续检测到 mixed 状态的次数（稳定性去抖）
+    let syncChannel = null;            // 【v1.2.7】BroadcastChannel 实例
 
     // ── 注册表操作 ──
 
@@ -2583,6 +2590,7 @@ const TabManager = (function() {
             bv: PageMonitor.getCurrentBV() || '',
             isWhitelisted: false,
             isStudying: false,
+            isVisible: !document.hidden,
             lastHeartbeat: Date.now(),
             windowTitle: document.title,
             registeredAt: Date.now()
@@ -2667,6 +2675,20 @@ const TabManager = (function() {
             tabId: TAB_ID.substring(0, 12) + '...',
             claimedAt: new Date(now).toLocaleTimeString()
         });
+        // 【v1.2.7】通过 BroadcastChannel 广播 Master 声明
+        if (syncChannel) {
+            try {
+                syncChannel.postMessage({
+                    type: 'master_claimed',
+                    tabId: TAB_ID,
+                    isMaster: true,
+                    timestamp: now
+                });
+                DebugTelemetry.logMultiTab('broadcast_master_claimed', {
+                    tabId: TAB_ID.substring(0, 12) + '...'
+                });
+            } catch (e) { /* ignore */ }
+        }
     }
 
     // 释放 Master
@@ -2688,6 +2710,20 @@ const TabManager = (function() {
                 tabId: TAB_ID.substring(0, 12) + '...',
                 reason: 'visibility_change_or_focus_lost'
             });
+            // 【v1.2.7】通过 BroadcastChannel 广播 Master 释放
+            if (syncChannel) {
+                try {
+                    syncChannel.postMessage({
+                        type: 'master_released',
+                        tabId: TAB_ID,
+                        isMaster: false,
+                        timestamp: Date.now()
+                    });
+                    DebugTelemetry.logMultiTab('broadcast_master_released', {
+                        tabId: TAB_ID.substring(0, 12) + '...'
+                    });
+                } catch (e) { /* ignore */ }
+            }
         }
     }
 
@@ -2792,6 +2828,8 @@ const TabManager = (function() {
 
     function listenForFocus() {
         window.addEventListener('focus', function() {
+            // 【v1.2.7】窗口获得焦点时更新 isVisible
+            updateRegistration({ isVisible: !document.hidden });
             if (!document.hidden) {
                 // 窗口获得焦点且可见：如果当前不是 Master，尝试抢夺
                 if (!isMaster) {
@@ -2817,6 +2855,10 @@ const TabManager = (function() {
                     }
                 }
             }
+        });
+        // 【v1.2.7】窗口失去焦点时更新 isVisible
+        window.addEventListener('blur', function() {
+            updateRegistration({ isVisible: !document.hidden });
         });
     }
 
@@ -3284,6 +3326,27 @@ const TabManager = (function() {
             DebugTelemetry.captureSnapshot('dismiss_guide_window_resolved');
         }
 
+        // 【v1.2.7】window_resolved / user_close 时记录 BV 到历史，并广播通知其他窗口
+        if ((reason === 'window_resolved' || reason === 'user_close') && PageMonitor.getCurrentBV) {
+            const bv = PageMonitor.getCurrentBV();
+            if (bv) {
+                const title = document.title.replace('_哔哩哔哩_bilibili', '').replace('_哔哩哔哩', '').trim() || bv;
+                HistoryVideoTracker.record(bv, title, 'distraction', reason === 'window_resolved' ? 'multiwindow' : 'user_close');
+                // 广播 window_resolved 给其他窗口，附带视频标题
+                if (syncChannel) {
+                    try {
+                        syncChannel.postMessage({
+                            type: 'window_resolved',
+                            tabId: TAB_ID,
+                            videoTitle: title,
+                            timestamp: Date.now()
+                        });
+                        DebugTelemetry.logMultiTab('broadcast_window_resolved', { bv: bv.substring(0, 12), title: title });
+                    } catch (e) { /* ignore */ }
+                }
+            }
+        }
+
         // 如果不再是多窗口，恢复计时
         if (!currentMulti) {
             _setPaused(false);
@@ -3374,6 +3437,9 @@ const TabManager = (function() {
     }
 
     // 在引导弹窗场景中显示轻量 Toast 反馈
+    // 【v1.2.7】修复 Toast 闪现：0.2s ease-in-out 过渡，最少可见 500ms，防快速连续闪烁
+    var _toastTimerId = null;
+    var _toastStartTime = 0;
     function _showGuideToast(message) {
         // 复用已有的 Toast 逻辑（如果存在），否则创建简单的临时 Toast
         let toast = document.getElementById('bilibili-study-guide-toast');
@@ -3383,43 +3449,122 @@ const TabManager = (function() {
             toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
                 'padding:10px 20px;border-radius:10px;font-size:14px;z-index:1000010;' +
                 'background:rgba(34,139,34,0.9);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.3);' +
-                'transition:opacity 0.3s;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+                'transition:opacity 0.2s ease-in-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
             document.body.appendChild(toast);
         }
         toast.textContent = message;
         toast.style.opacity = '1';
+        _toastStartTime = Date.now();
 
-        // 3秒后自动消失
-        setTimeout(function() {
-            if (toast) toast.style.opacity = '0';
-            setTimeout(function() {
-                if (toast && toast.parentNode) toast.remove();
-            }, 300);
+        // 清除之前的定时器，防止快速连续调用导致闪烁
+        if (_toastTimerId) {
+            clearTimeout(_toastTimerId);
+            _toastTimerId = null;
+        }
+
+        // 最少可见 500ms 后才开始 fadeOut
+        _toastTimerId = setTimeout(function() {
+            var elapsed = Date.now() - _toastStartTime;
+            var remaining = Math.max(0, 500 - elapsed);
+            // 如果已过时间不足 500ms，继续等待补齐
+            if (remaining > 0) {
+                _toastTimerId = setTimeout(function() {
+                    if (toast) toast.style.opacity = '0';
+                    setTimeout(function() {
+                        if (toast && toast.parentNode) toast.remove();
+                        _toastTimerId = null;
+                    }, 300);
+                }, remaining);
+            } else {
+                if (toast) toast.style.opacity = '0';
+                setTimeout(function() {
+                    if (toast && toast.parentNode) toast.remove();
+                    _toastTimerId = null;
+                }, 300);
+            }
         }, 3000);
     }
 
     // ── 初始化 ──
 
+    // 【v1.2.7】设置 BroadcastChannel 多窗口同步
+    function _setupBroadcastChannel() {
+        try {
+            if (typeof BroadcastChannel === 'undefined') {
+                DebugTelemetry.logMultiTab('broadcast_channel_unsupported', { reason: 'BroadcastChannel not available' });
+                return;
+            }
+            syncChannel = new BroadcastChannel('bilibili-study-sync');
+            syncChannel.onmessage = function(event) {
+                var msg = event.data;
+                if (!msg || !msg.type) return;
+                DebugTelemetry.logMultiTab('broadcast_channel_received', {
+                    type: msg.type,
+                    tabId: (msg.tabId || '').substring(0, 12) + '...',
+                    isMaster: msg.isMaster,
+                    timestamp: msg.timestamp
+                });
+                // 处理不同类型的广播消息
+                switch (msg.type) {
+                    case 'master_claimed':
+                        // 其他窗口声称成为 Master，如果该消息来自其他窗口，放弃自己的 Master 状态
+                        if (msg.tabId !== TAB_ID && isMaster) {
+                            DebugTelemetry.logMultiTab('broadcast_master_claim_other', {
+                                myTab: TAB_ID.substring(0, 12) + '...',
+                                otherTab: (msg.tabId || '').substring(0, 12) + '...'
+                            });
+                            isMaster = false;
+                            masterClaimTime = 0;
+                        }
+                        break;
+                    case 'master_released':
+                        // Master 已释放，触发重新选举
+                        if (msg.tabId !== TAB_ID) {
+                            setTimeout(function() { elect(); }, 100);
+                        }
+                        break;
+                    case 'window_resolved':
+                        // 其他窗口的多窗口问题已解决，显示 Toast 通知
+                        if (msg.tabId !== TAB_ID && msg.videoTitle) {
+                            _showGuideToast('\u2705 \u6709\u89c6\u9891\u5df2\u8bb0\u5f55\uff1a' + msg.videoTitle);
+                        }
+                        break;
+                }
+            };
+            DebugTelemetry.logMultiTab('broadcast_channel_ready', {
+                tabId: TAB_ID.substring(0, 12) + '...'
+            });
+        } catch (e) {
+            DebugTelemetry.logMultiTab('broadcast_channel_error', {
+                error: e.message
+            });
+            syncChannel = null;
+        }
+    }
+
     function init() {
         // 1. 注册自己
         registerSelf();
 
-        // 2. Master 选举
+        // 2. 【v1.2.7】设置 BroadcastChannel
+        _setupBroadcastChannel();
+
+        // 3. Master 选举
         elect();
 
-        // 3. 启动心跳
+        // 4. 启动心跳
         startHeartbeat();
 
-        // 4. 启动多窗口检测
+        // 5. 启动多窗口检测
         startMultiWindowCheck();
 
-        // 5. 监听可见性变化
+        // 6. 监听可见性变化
         listenForVisibilityChange();
 
-        // 6. 监听焦点
+        // 7. 监听焦点
         listenForFocus();
 
-        // 7. 监听窗口关闭
+        // 8. 监听窗口关闭
         listenForUnload();
 
         console.log('[B站学习助手] TabManager.init: 初始化完成', {
