@@ -1,21 +1,15 @@
-# 当前任务 — v1.2.6.2 DebugTelemetry + 瞬态Bug修复
-- 状态: 进行中
+# 当前任务 — v1.3.0 P0 自动导航 + P2 三级阻拦 + Stage 动态化
+- 状态: 已完成
 - 创建: 2026-05-08
-- 目标: 搭建轻量级可观测性系统 + 修复多窗口瞬态弹窗Bug
+- 目标: P0 自动跳转逻辑 + P2 三级干预整合 + 干预阶段动态配置
 
 ## 已完成
-- [x] AGENTS.md — 项目简报
-- [x] harness/scripts/init.sh — 环境初始化
-- [x] harness/scripts/check.sh — 统一检查入口
-- [x] harness/evals/cases/ — 11 个评估用例
-- [x] harness/tasks/active.md — 任务跟踪
-- [x] DebugTelemetry 模块 — 三层可观测性系统
-- [x] hasMixedWindowTypes Bug修复 — isVisible过滤 + 2-cycle稳定性
-- [x] Telemetry 日志埋点 — TabManager关键路径
+- [x] v1.2.6.2 — DebugTelemetry + 瞬态Bug修复
+- [x] v1.2.7 — BroadcastChannel 多窗口同步 + BV号记忆增强 + Toast修复 + isVisible 稳定性
+- [x] v1.3.0 — P0 自动导航倒计时跳转 + P2 三级阻拦整合 + Stage 动态化配置
+- [x] AGENTS.md / SCRIPT_LOGIC.md / CHANGELOG.md — 文档同步至 v1.3.0
+- [x] harness/harness-config.md — 演进日志更新
+- [x] harness/tasks/active.md — 任务跟踪更新
 
 ## 下一步
-- [ ] 使用 DebugTelemetry.dumpMultiWindowTrace() 检查真实运行效果
-- [ ] 在控制台验证：window.__bilibiliStudyDebugTelemetry
-
-## 已知风险
-- 评估用例目前是 Markdown 描述，无自动化验证脚本（后续可加 grader）
+- [ ] v1.3.1：待定
