@@ -1,5 +1,36 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.2.6.2] - 2026-05-08
+
+### 新增功能 ✨
+
+#### DebugTelemetry 可观测性系统（三层架构）
+- **事件日志**：环形缓冲保留最近 500 条事件，按 8 个分类标记（STATE/MULTI_TAB/INTERVENTION/TIMING/ERROR/PERF/USER_ACTION/SNAPSHOT）
+- **状态快照**：关键事件（触发引导/关闭引导/hasMixedWindowTypes 变化）自动捕获注册表+页面状态+配置摘要
+- **导出分析**：`query()` 按条件筛选、`dumpMultiWindowTrace()` 提取多窗口事件链、`exportJSON()` 导出完整日志
+- **localStorage 持久化**：快照保存到 `bilibiliStudy_telemetry`，保留最近 20 条
+- **控制台可访问**：`window.__bilibiliStudyDebugTelemetry` 全局挂载
+
+### Bug修复 🐛
+
+#### 多窗口瞬态引导弹窗闪现
+- **问题**：切换到娱乐视频时，学习视频放到后台，引导弹窗闪现后迅速消失
+- **根因**：`hasMixedWindowTypes()` 遍历注册表中所有活跃标签页，不区分前台/后台。后台标签页的 `isWhitelisted: true` 在注册表中残留 3~8 秒，单次 check 就触发引导
+- **修复**：
+  - `updateRegistration()` 增加 `isVisible` 字段，标记当前标签页是否在前台可见
+  - `hasMixedWindowTypes()` 跳过后台隐藏标签页（`isVisible === false`）
+  - 2-cycle 稳定性去抖——mixed 状态必须连续出现 2 个 check 周期（~10 秒）才触发引导
+  - `visibilitychange` 时立即更新 `isVisible`
+
+### 改进 🔧
+
+- `claimMaster()`/`releaseMaster()`：日志通过 DebugTelemetry 输出，带结构化数据
+- `_handleGuideChoice()`：用户操作日志通过 DebugTelemetry.USER_ACTION 分类输出
+- `dismissGuide('window_resolved')`：自动捕获状态快照，方便分析瞬态关闭场景
+- `updateRegistration()` 节流日志：增加 `visibleTabs` 字段
+
+---
+
 ## [1.2.6.1] - 2026-04-23
 
 ### Bug修复 🐛

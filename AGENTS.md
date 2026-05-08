@@ -42,17 +42,20 @@ f:\all_proj\study_help_web_app\
 ## 核心架构（IIFE 模块化）
 | 模块 | 行号范围 | 职责 |
 |------|----------|------|
-| STYLES | 19–575 | 全局 CSS |
-| USER_CONFIG | 590–643 | 默认配置 |
-| ConfigManager | 648–857 | 配置管理 |
-| StorageManager | 862–929 | 存储封装 |
-| PageMonitor | 997–1102 | URL/BV 监控 |
-| FloatingWindow | 1107–1360 | 悬浮窗 |
-| DetailPanel | 1365–1920 | 统计面板 |
-| WordVerifier | 1925–2061 | 单词验证 |
-| StatisticsTracker | 2066–2202 | 时间统计 |
-| InterventionController | 2207–2982 | 核心状态机 |
-| Main IIFE | 2987–3134 | 入口/主循环 |
+| STYLES | 17–1784 | 全局 CSS |
+| USER_CONFIG | 1786–1839 | 默认配置 |
+| ConfigManager | 1844–2053 | 配置管理 |
+| StorageManager | 2058–2125 | 存储封装 |
+| PageMonitor | 2193–2298 | URL/BV 监控 |
+| FloatingWindow | 2303–2556 | 悬浮窗 |
+| TabManager | 2712–3560 | 多窗口 Master 选举 + 引导弹窗 |
+| DebugTelemetry | 3565–3830 | 可观测性系统 |
+| HistoryVideoTracker | 3835–3915 | 离开视频记录 |
+| DetailPanel | 3977–5260 | 统计面板 |
+| WordVerifier | 5265–5401 | 单词验证 |
+| StatisticsTracker | 5406–5542 | 时间统计 |
+| InterventionController | 5547–6322 | 核心状态机 |
+| Main IIFE | 6327–6474 | 入口/主循环 |
 
 ## 关键约定
 - `__bilibiliStudyAppState` 为全局状态对象
@@ -62,8 +65,9 @@ f:\all_proj\study_help_web_app\
 - 版本号格式：`vX.Y.Z`（主版本.次版本.补丁），小修复用 `vX.Y.Z.Z`
 
 ## 当前版本
-v1.2.6.1 — 多窗口 Master 选举 + 引导弹窗（见 CHANGELOG.md）
+v1.2.6.2 — 多窗口 Master 选举 + DebugTelemetry 可观测性系统（见 CHANGELOG.md）
 
 ## 后续路线
-- v1.2.6.2+：多窗口引导弹窗重复 / toast 逻辑异常修復
+- v1.2.6.3+：多窗口引导弹窗重复 / toast 逻辑异常修复
+- v1.2.7：BroadcastChannel + 多窗口实时状态同步 + BV号记忆
 - v1.3.0：P0 自动跳转 + P2 三级干预整合

@@ -17,10 +17,11 @@ Feedback Eng    → evals/  (反馈闭环)
 | **项目简报** | `AGENTS.md` | Agent 导航和项目上下文 |
 | **初始化脚本** | `harness/scripts/init.sh` | 环境准备 |
 | **检查脚本** | `harness/scripts/check.sh` | 统一验证入口 |
-| **评估集** | `harness/evals/cases/` | 10 个代表性任务 |
+| **评估集** | `harness/evals/cases/` | 12 个代表性任务 |
 | **任务跟踪** | `harness/tasks/` | 当前进度管理 |
 | **工作记忆** | `.workbuddy/memory/` | 跨会话上下文 |
 | **主脚本** | `bilibili-study-focus-assistant.user.js` | 交付物 |
+| **DebugTelemetry** | 内嵌于主脚本 | 可观测性系统 |
 
 ## 评估集使用
 ```bash
@@ -33,3 +34,4 @@ ls harness/evals/cases/
 | 日期 | 变更 | 原因 |
 |------|------|------|
 | 2026-05-08 | 初始 MVP | Harness 构建第一条记录 |
+| 2026-05-08 | v1.2.6.2 同步 | Eval 集扩充至 12 个，新增 DebugTelemetry 组件 |
