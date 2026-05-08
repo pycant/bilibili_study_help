@@ -2250,52 +2250,101 @@ const ConfigManager = (function() {
 
     // v1.2.4: 根据 interventionLevel 获取实际生效的干预阶段配置
     // 如果用户自定义过 interventionStages 则优先用自定义的
+    // v1.3.0: 增加 level 字段
     function getEffectiveInterventionStages() {
         const config = get();
         // 如果 localStorage 中存了自定义的 interventionStages，优先使用
         if (config.interventionStages && config._customStages) {
-            return config.interventionStages;
+            // 确保旧格式向后兼容：为自定义阶段也添加 level 字段
+            return config.interventionStages.map((s, i) => {
+                if (s.level) return s;
+                if (i <= 1) return { ...s, level: 'gentle' };
+                if (i <= 2) return { ...s, level: 'moderate' };
+                return { ...s, level: 'aggressive' };
+            });
         }
 
         const level = config.interventionLevel || 'standard';
-        const LEVEL_STAGES = {
-            gentle: [
-                { threshold: 0, interval: 0 },
-                { threshold: 180, interval: 0 },     // 3min
-                { threshold: 600, interval: 120 },    // 10min, popup 2min
-                { threshold: 1200, interval: 60 },    // 20min, popup 1min
-                { threshold: 2400, interval: 30 }     // 40min, popup 30s
-            ],
-            standard: [
-                { threshold: 0, interval: 0 },
-                { threshold: 60, interval: 0 },       // 1min
-                { threshold: 180, interval: 60 },     // 3min, popup 1min
-                { threshold: 600, interval: 30 },     // 10min, popup 30s
-                { threshold: 1200, interval: 15 }     // 20min, popup 15s
-            ],
-            strict: [
-                { threshold: 0, interval: 0 },
-                { threshold: 30, interval: 0 },       // 30s
-                { threshold: 60, interval: 30 },      // 1min, popup 30s
-                { threshold: 180, interval: 15 },     // 3min, popup 15s
-                { threshold: 600, interval: 10 }      // 10min, popup 10s
-            ]
+        const profile = getInterventionProfile(level);
+        return profile ? profile.stages : getInterventionProfile('standard').stages;
+    }
+
+    // v1.3.0: 获取干预级别完整配置档案（包含阶段配置+视觉效果参数）
+    function getInterventionProfile(level) {
+        const PROFILES = {
+            gentle: {
+                // 温和：分心3min开始，12s弹窗间隔，灰度80%，无反色
+                stages: [
+                    { threshold: 0, interval: 0, level: 'gentle' },
+                    { threshold: 180, interval: 0, level: 'gentle' },
+                    { threshold: 600, interval: 12, level: 'gentle' },
+                    { threshold: 1200, interval: 12, level: 'gentle' },
+                    { threshold: 2400, interval: 12, level: 'gentle' }
+                ],
+                visual: { maxInvert: 0, maxGrayscale: 80, minOpacity: 0.7 }
+            },
+            standard: {
+                // 标准（默认）：分心1min开始，8s弹窗间隔，灰度60%+反色20%
+                stages: [
+                    { threshold: 0, interval: 0, level: 'gentle' },
+                    { threshold: 60, interval: 0, level: 'gentle' },
+                    { threshold: 180, interval: 8, level: 'standard' },
+                    { threshold: 600, interval: 8, level: 'standard' },
+                    { threshold: 1200, interval: 8, level: 'standard' }
+                ],
+                visual: { maxInvert: 20, maxGrayscale: 60, minOpacity: 0.75 }
+            },
+            strict: {
+                // 严格：分心30s开始，5s弹窗间隔，灰度40%+反色40%+文字遮挡层
+                stages: [
+                    { threshold: 0, interval: 0, level: 'gentle' },
+                    { threshold: 30, interval: 0, level: 'gentle' },
+                    { threshold: 60, interval: 5, level: 'strict' },
+                    { threshold: 180, interval: 5, level: 'strict' },
+                    { threshold: 600, interval: 5, level: 'strict' }
+                ],
+                visual: { maxInvert: 40, maxGrayscale: 40, minOpacity: 0.6 }
+            }
         };
-        return LEVEL_STAGES[level] || LEVEL_STAGES.standard;
+        return PROFILES[level] || PROFILES.standard;
+    }
+
+    // v1.3.0: 根据 interventionLevel 获取阶段对应的干预级别标记
+    function getInterventionLevel(stage) {
+        const config = get();
+        const level = config.interventionLevel || 'standard';
+        const profile = getInterventionProfile(level);
+        if (!profile || !profile.stages || stage < 0 || stage >= profile.stages.length) {
+            return stage <= 1 ? 'gentle' : 'aggressive';
+        }
+        return profile.stages[stage].level || 'gentle';
     }
 
     // v1.2.4: 根据 visualEffectLevel 获取视觉效果参数
     // 返回 { maxInvert, maxGrayscale, minOpacity }
     function getVisualEffectParams() {
         const config = get();
-        const level = config.visualEffectLevel || 'heavy';
-        const LEVEL_PARAMS = {
-            none:   { maxInvert: 0,   maxGrayscale: 0,   minOpacity: 1 },
-            light:  { maxInvert: 40,  maxGrayscale: 40,  minOpacity: 0.85 },
-            medium: { maxInvert: 70,  maxGrayscale: 60,  minOpacity: 0.75 },
-            heavy:  { maxInvert: 100, maxGrayscale: 80,  minOpacity: 0.6 }
-        };
-        return LEVEL_PARAMS[level] || LEVEL_PARAMS.heavy;
+        // v1.3.0: 优先从干预配置读取视觉效果参数
+        const level = config.interventionLevel || 'standard';
+        const profile = getInterventionProfile(level);
+        // 保留 visualEffectLevel 覆盖能力
+        const overrideLevel = config.visualEffectLevel;
+        if (overrideLevel && overrideLevel !== 'heavy') {
+            const LEVEL_PARAMS = {
+                none:   { maxInvert: 0,   maxGrayscale: 0,   minOpacity: 1 },
+                light:  { maxInvert: 40,  maxGrayscale: 40,  minOpacity: 0.85 },
+                medium: { maxInvert: 70,  maxGrayscale: 60,  minOpacity: 0.75 },
+                heavy:  { maxInvert: 100, maxGrayscale: 80,  minOpacity: 0.6 }
+            };
+            return LEVEL_PARAMS[overrideLevel] || profile.visual;
+        }
+        return profile.visual;
+    }
+
+    // v1.3.0: 获取最近学习的BV号（P6休闲时段预留，当前返回null）
+    function getRecentStudyBV() {
+        // TODO: P1 实现后从 StatisticsTracker 历史记录中获取
+        return null;
     }
 
     return {
@@ -2313,7 +2362,11 @@ const ConfigManager = (function() {
         removeFromWhitelist,
         getWhitelistArray,
         getCourseName,
-        getDefaultReturnBV
+        getDefaultReturnBV,
+        // v1.3.0 新增
+        getInterventionProfile,
+        getInterventionLevel,
+        getRecentStudyBV
     };
 })();
 
@@ -3446,9 +3499,14 @@ const TabManager = (function() {
         if (!toast) {
             toast = document.createElement('div');
             toast.id = 'bilibili-study-guide-toast';
+            // 【v1.2.7】暗色模式适配
+            var _isDarkToast = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
+                               document.body.classList.contains('bilibili-study-dark-mode');
+            var _toastBg = _isDarkToast ? 'rgba(17,17,17,0.95)' : 'rgba(34,139,34,0.9)';
+            var _toastColor = _isDarkToast ? '#e0e0e0' : '#fff';
             toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
                 'padding:10px 20px;border-radius:10px;font-size:14px;z-index:1000010;' +
-                'background:rgba(34,139,34,0.9);color:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.3);' +
+                'background:' + _toastBg + ';color:' + _toastColor + ';box-shadow:0 2px 12px rgba(0,0,0,0.3);' +
                 'transition:opacity 0.2s ease-in-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
             document.body.appendChild(toast);
         }
