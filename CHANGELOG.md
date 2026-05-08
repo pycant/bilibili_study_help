@@ -1,5 +1,54 @@
 # B站学习专注提醒助手 - 更新日志
 
+## [1.3.0] - 2026-05-08
+
+### 新增功能 ✨
+
+#### P0 自动导航
+- **自动跳转逻辑**：分心确认弹窗关闭后显示 3 秒倒计时 Toast，结束后自动跳转到白名单学习视频
+- **可配置开关**：设置面板 → 自动导航（P0）radio 选择，默认开启
+- **配置持久化**：`autoNavigate` 字段保存到 localStorage
+- **倒计时交互**：Toast 显示剩余秒数，右上角"×"可取消跳转
+
+#### P2 三级阻拦整合
+- **Stage 动态化**：干预阶段配置从硬编码改为 ConfigManager 动态加载
+- **三级阻拦结构**：Stage 1（渐进视觉）→ Stage 2（填空弹窗）→ Stage 3/4（单词验证）
+- **弹窗间隔可配置**：每阶段弹窗间隔通过 `interventionStages` 配置动态控制
+
+#### Stage 动态化
+- **阶段阈值配置**：移除硬编码阈值，改为从 `interventionStages` 配置数组读取
+- **运行时可变**：修改配置后实时生效，无需刷新页面
+- **配置项新增**：`interventionStages` 数组，每项含 `threshold`（秒）和 `interval`（秒）
+
+---
+
+## [1.2.7] - 2026-05-08
+
+### 新增功能 ✨
+
+#### BroadcastChannel 多窗口同步
+- **实时状态广播**：Master 声明/释放通过 BroadcastChannel 实时通知所有同源标签页
+- **实例管理**：`TabManager._setupBroadcastChannel()` 初始化，兼容不支持 BroadcastChannel 的浏览器
+- **日志追踪**：`broadcast_channel_unsupported` 事件通过 DebugTelemetry 记录
+
+#### BV号记忆增强
+- **SPA导航 BV 追踪**：`PageMonitor.getLastBV()` 返回离开视频的 BV 号
+- **beforeunload 记录**：关闭标签页时自动记录当前 BV 号到 HistoryVideoTracker
+- **路由变化记录**：SPA 导航切换时记录离开视频信息
+
+### Bug修复 🐛
+
+#### Toast 显示逻辑修复
+- **问题**：引导弹窗白名单添加成功后 Toast 偶尔不显示
+- **根因**：Toast 创建时 modalState 检查冲突，被其他弹窗状态阻塞
+- **修复**：Toast 通过 ModalManager Toast 层级（1）独立管理，不受干预弹窗状态影响
+
+#### isVisible 字段稳定性
+- **问题**：多窗口场景下 `isVisible` 更新不及时，导致 hasMixedWindowTypes 误判
+- **修复**：`visibilitychange` 事件立即同步 `isVisible` 到注册表，并广播通知其他窗口
+
+---
+
 ## [1.2.6.2] - 2026-05-08
 
 ### 新增功能 ✨

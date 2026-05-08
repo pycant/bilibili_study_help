@@ -14,7 +14,7 @@
 ## 项目结构
 ```
 f:\all_proj\study_help_web_app\
-├── bilibili-study-focus-assistant.user.js    # 主脚本（~3100+行 IIFE 模块化）
+├── bilibili-study-focus-assistant.user.js    # 主脚本（~8100行 IIFE 模块化）
 ├── bilibili-study-focus-assistant.test.js    # 属性测试
 ├── AGENTS.md                                 # ← 本文件：Agent 简报
 ├── CHANGELOG.md                              # 完整版本历史
@@ -42,20 +42,22 @@ f:\all_proj\study_help_web_app\
 ## 核心架构（IIFE 模块化）
 | 模块 | 行号范围 | 职责 |
 |------|----------|------|
-| STYLES | 17–1784 | 全局 CSS |
-| USER_CONFIG | 1786–1839 | 默认配置 |
-| ConfigManager | 1844–2053 | 配置管理 |
-| StorageManager | 2058–2125 | 存储封装 |
-| PageMonitor | 2193–2298 | URL/BV 监控 |
-| FloatingWindow | 2303–2556 | 悬浮窗 |
-| TabManager | 2712–3560 | 多窗口 Master 选举 + 引导弹窗 |
-| DebugTelemetry | 3565–3830 | 可观测性系统 |
-| HistoryVideoTracker | 3835–3915 | 离开视频记录 |
-| DetailPanel | 3977–5260 | 统计面板 |
-| WordVerifier | 5265–5401 | 单词验证 |
-| StatisticsTracker | 5406–5542 | 时间统计 |
-| InterventionController | 5547–6322 | 核心状态机 |
-| Main IIFE | 6327–6474 | 入口/主循环 |
+| STYLES | 20–1782 | 全局 CSS |
+| USER_CONFIG | 1787–1959 | 默认配置 |
+| ConfigManager | 1964–2371 | 配置管理 |
+| GlobalStateManager | 2378–2572 | 全局状态持久化 |
+| TabManager | 2579–3649 | 多窗口 Master + BroadcastChannel |
+| DebugTelemetry | 3656–3904 | 可观测性系统 |
+| HistoryVideoTracker | 3911–3993 | 离开视频记录 |
+| StorageManager | 3995–4062 | 存储封装 |
+| PageMonitor | 4131–4244 | URL/BV 监控 |
+| FloatingWindow | 4249–4525 | 悬浮窗 |
+| DetailPanel | 4530–6054 | 统计面板 |
+| WordVerifier | 6059–6250 | 单词验证 |
+| StatisticsTracker | 6255–6391 | 时间统计 |
+| ModalManager | 6397–6533 | 弹窗层级管理 |
+| InterventionController | 6538–7972 | 核心状态机 |
+| Main IIFE | 7977–8096 | 入口/主循环 |
 
 ## 关键约定
 - `__bilibiliStudyAppState` 为全局状态对象
@@ -65,9 +67,10 @@ f:\all_proj\study_help_web_app\
 - 版本号格式：`vX.Y.Z`（主版本.次版本.补丁），小修复用 `vX.Y.Z.Z`
 
 ## 当前版本
-v1.2.6.2 — 多窗口 Master 选举 + DebugTelemetry 可观测性系统（见 CHANGELOG.md）
+v1.3.0 — P0 自动导航 + P2 三级阻拦 + Stage动态化（见 CHANGELOG.md）
 
 ## 后续路线
-- v1.2.6.3+：多窗口引导弹窗重复 / toast 逻辑异常修复
-- v1.2.7：BroadcastChannel + 多窗口实时状态同步 + BV号记忆
-- v1.3.0：P0 自动跳转 + P2 三级干预整合
+- ✅ v1.2.6.3+：多窗口引导弹窗重复 / toast 逻辑异常修复（已合入 v1.2.6.2）
+- ✅ v1.2.7：BroadcastChannel + 多窗口实时状态同步 + BV号记忆
+- ✅ v1.3.0：P0 自动跳转 + P2 三级干预整合
+- v1.3.1+：待定
