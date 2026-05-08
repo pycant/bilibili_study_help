@@ -5151,13 +5151,14 @@ const FloatingWindow = (function() {
 // 调试面板：Logs/Metrics/Traces 三视图，集成到 DetailPanel
 // 数据来源：DebugTelemetry（事件日志+指标+快照）
 const TelemetryUI = (function() {
-    let _drawerEl = null;        // 抽屉面板 DOM
+    let _floatWin = null;        // 浮动窗口 DOM
     let _activeView = 'logs';    // 当前视图: logs | metrics | traces
     let _refreshTimer = null;    // 自动刷新定时器
     let _displayCount = 10;      // 当前显示的事件条数（渐进式）
     let _currentFilter = null;   // 当前筛选条件 { category, eventPattern }
     let _autoSaveTimer = null;   // 自动保存定时器
     let _autoSaveInterval = 300000; // 默认5分钟
+    const POSITION_KEY = 'bilibiliStudyAssistant_telemetryPosition';
 
     // 分类中文名映射（方便你看懂）
     var CATEGORY_LABELS = {
@@ -5183,43 +5184,95 @@ const TelemetryUI = (function() {
         SNAPSHOT:     '#6b7280'   // 灰色
     };
 
+    // ── 拖拽实现 ──
+    function _makeDraggable(header, win) {
+        var offsetX = 0, offsetY = 0, mouseX = 0, mouseY = 0;
+        header.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            offsetX = e.clientX - win.offsetLeft;
+            offsetY = e.clientY - win.offsetTop;
+            document.addEventListener('mousemove', _onMouseMove);
+            document.addEventListener('mouseup', _onMouseUp);
+        });
+        function _onMouseMove(e) {
+            win.style.left = (e.clientX - offsetX) + 'px';
+            win.style.top = (e.clientY - offsetY) + 'px';
+        }
+        function _onMouseUp() {
+            document.removeEventListener('mousemove', _onMouseMove);
+            document.removeEventListener('mouseup', _onMouseUp);
+            _savePosition();
+        }
+    }
+
+    // ── 保存位置 ──
+    function _savePosition() {
+        if (!_floatWin) return;
+        try {
+            localStorage.setItem(POSITION_KEY, JSON.stringify({
+                x: _floatWin.offsetLeft,
+                y: _floatWin.offsetTop
+            }));
+        } catch (e) {
+            console.warn('[B站学习助手] Failed to save telemetry window position:', e);
+        }
+    }
+
     // ── 主入口：打开调试面板 ──
     function open() {
         // 如果已存在则直接显示
-        if (_drawerEl) {
-            _drawerEl.style.display = 'block';
+        if (_floatWin) {
+            _floatWin.style.display = 'block';
             _refreshView();
             return;
         }
 
-        // 创建抽屉面板
-        _drawerEl = document.createElement('div');
-        _drawerEl.id = 'bilibili-study-telemetry-drawer';
-        _drawerEl.innerHTML = `
-            <div class="bilibili-study-telemetry-header">
-                <span class="bilibili-study-telemetry-title">🔍 调试面板</span>
-                <span class="bilibili-study-telemetry-close" id="bilibili-study-telemetry-close">✕</span>
+        // 创建浮动窗口
+        _floatWin = document.createElement('div');
+        _floatWin.id = 'bilibili-study-telemetry-float';
+        _floatWin.className = 'bilibili-study-telemetry-float';
+        _floatWin.innerHTML = `
+            <div class="bilibili-study-telemetry-float-header">
+                <span class="bilibili-study-telemetry-float-title">🔍 调试面板</span>
+                <span class="bilibili-study-telemetry-float-close" id="bilibili-study-telemetry-float-close">✕</span>
             </div>
-            <div class="bilibili-study-telemetry-tabs">
-                <span class="bilibili-study-telemetry-tab active" data-view="logs">📋 日志</span>
-                <span class="bilibili-study-telemetry-tab" data-view="metrics">📊 指标</span>
-                <span class="bilibili-study-telemetry-tab" data-view="traces">🔗 追踪</span>
+            <div class="bilibili-study-telemetry-float-tabs">
+                <span class="bilibili-study-telemetry-float-tab active" data-view="logs">📋 日志</span>
+                <span class="bilibili-study-telemetry-float-tab" data-view="metrics">📊 指标</span>
+                <span class="bilibili-study-telemetry-float-tab" data-view="traces">🔗 追踪</span>
             </div>
-            <div class="bilibili-study-telemetry-content" id="bilibili-study-telemetry-content">
-                <div class="bilibili-study-telemetry-loading">加载中...</div>
+            <div class="bilibili-study-telemetry-float-content" id="bilibili-study-telemetry-float-content">
+                <div class="bilibili-study-telemetry-float-loading">加载中...</div>
             </div>
         `;
 
-        var panel = DetailPanel._getModalElement ? DetailPanel._getModalElement() : document.querySelector('.bilibili-study-modal');
-        if (panel) {
-            panel.appendChild(_drawerEl);
-        } else {
-            document.body.appendChild(_drawerEl);
+        document.body.appendChild(_floatWin);
+
+        // 恢复上次位置
+        try {
+            var saved = localStorage.getItem(POSITION_KEY);
+            if (saved) {
+                var pos = JSON.parse(saved);
+                _floatWin.style.left = pos.x + 'px';
+                _floatWin.style.top = pos.y + 'px';
+            } else {
+                _floatWin.style.left = '20px';
+                _floatWin.style.top = '80px';
+            }
+        } catch (e) {
+            _floatWin.style.left = '20px';
+            _floatWin.style.top = '80px';
         }
 
-        // 绑定事件
-        _drawerEl.querySelector('#bilibili-study-telemetry-close').addEventListener('click', close);
-        var tabs = _drawerEl.querySelectorAll('.bilibili-study-telemetry-tab');
+        // 绑定拖拽（header 区域）
+        var header = _floatWin.querySelector('.bilibili-study-telemetry-float-header');
+        _makeDraggable(header, _floatWin);
+
+        // 绑定关闭事件
+        _floatWin.querySelector('#bilibili-study-telemetry-float-close').addEventListener('click', close);
+
+        // 绑定 tab 切换
+        var tabs = _floatWin.querySelectorAll('.bilibili-study-telemetry-float-tab');
         for (var i = 0; i < tabs.length; i++) {
             (function(tab) {
                 tab.addEventListener('click', function() {
@@ -5255,17 +5308,17 @@ const TelemetryUI = (function() {
             clearInterval(_autoSaveTimer);
             _autoSaveTimer = null;
         }
-        if (_drawerEl) {
-            _drawerEl.style.display = 'none';
+        if (_floatWin) {
+            _floatWin.style.display = 'none';
         }
     }
 
     // ── 彻底销毁 ──
     function destroy() {
         close();
-        if (_drawerEl) {
-            _drawerEl.remove();
-            _drawerEl = null;
+        if (_floatWin) {
+            _floatWin.remove();
+            _floatWin = null;
         }
     }
 
@@ -5276,8 +5329,8 @@ const TelemetryUI = (function() {
         _currentFilter = null;
 
         // 更新 tab 高亮
-        if (_drawerEl) {
-            var tabs = _drawerEl.querySelectorAll('.bilibili-study-telemetry-tab');
+        if (_floatWin) {
+            var tabs = _floatWin.querySelectorAll('.bilibili-study-telemetry-float-tab');
             for (var i = 0; i < tabs.length; i++) {
                 tabs[i].classList.remove('active');
                 if (tabs[i].getAttribute('data-view') === viewName) {
@@ -5290,8 +5343,8 @@ const TelemetryUI = (function() {
 
     // ── 刷新当前视图 ──
     function _refreshView() {
-        if (!_drawerEl) return;
-        var content = _drawerEl.querySelector('#bilibili-study-telemetry-content');
+        if (!_floatWin) return;
+        var content = _floatWin.querySelector('#bilibili-study-telemetry-float-content');
         if (!content) return;
 
         switch (_activeView) {
@@ -5319,24 +5372,24 @@ const TelemetryUI = (function() {
 
         var html = '';
         // 筛选栏
-        html += '<div class="bilibili-study-telemetry-filter">';
-        html += '<span class="bilibili-study-telemetry-filter-label">筛选:</span> ';
+        html += '<div class="bilibili-study-telemetry-float-filter">';
+        html += '<span class="bilibili-study-telemetry-float-filter-label">筛选:</span> ';
         var cats = ['', 'STATE', 'MULTI_TAB', 'INTERVENTION', 'ERROR', 'USER_ACTION'];
         for (var c = 0; c < cats.length; c++) {
             var cat = cats[c];
             var label = cat ? (CATEGORY_LABELS[cat] || cat) : '全部';
             var active = (!_currentFilter && !cat) || (_currentFilter && _currentFilter.category === cat) ? ' active' : '';
-            html += '<span class="bilibili-study-telemetry-filter-btn' + active + '" data-cat="' + cat + '">' + label + '</span>';
+            html += '<span class="bilibili-study-telemetry-float-filter-btn' + active + '" data-cat="' + cat + '">' + label + '</span>';
         }
         html += '</div>';
 
         // 概要栏（渐进式披露第一步：先看总数）
-        html += '<div class="bilibili-study-telemetry-summary">';
+        html += '<div class="bilibili-study-telemetry-float-summary">';
         html += '总计 ' + totalEvents + ' 条 | 当前显示 ' + _displayCount + ' 条 | 错误 ' + errorCount + ' 条';
         html += '</div>';
 
         // 事件列表（渐进式披露第二步：逐条截断）
-        html += '<div class="bilibili-study-telemetry-list">';
+        html += '<div class="bilibili-study-telemetry-float-list">';
         for (var e = displayEvents.length - 1; e >= 0; e--) {
             var ev = displayEvents[e];
             var time = new Date(ev.ts);
@@ -5346,17 +5399,17 @@ const TelemetryUI = (function() {
             var catColor = CATEGORY_COLORS[ev.category] || '#6b7280';
             var catLabel = CATEGORY_LABELS[ev.category] || ev.category;
             var isError = ev.category === 'ERROR';
-            var rowClass = isError ? ' bilibili-study-telemetry-row-error' : '';
+            var rowClass = isError ? ' bilibili-study-telemetry-float-row-error' : '';
 
             // 每行只显示：时间 + 分类标签 + 事件名（渐进式披露）
-            html += '<div class="bilibili-study-telemetry-row' + rowClass + '" data-idx="' + e + '">';
-            html += '<span class="bilibili-study-telemetry-row-time">' + timeStr + '</span>';
-            html += '<span class="bilibili-study-telemetry-row-cat" style="color:' + catColor + '">[' + catLabel + ']</span>';
-            html += '<span class="bilibili-study-telemetry-row-event">' + _escapeHtml(ev.event) + '</span>';
+            html += '<div class="bilibili-study-telemetry-float-row' + rowClass + '" data-idx="' + e + '">';
+            html += '<span class="bilibili-study-telemetry-float-row-time">' + timeStr + '</span>';
+            html += '<span class="bilibili-study-telemetry-float-row-cat" style="color:' + catColor + '">[' + catLabel + ']</span>';
+            html += '<span class="bilibili-study-telemetry-float-row-event">' + _escapeHtml(ev.event) + '</span>';
             // 有 data 时显示展开箭头（渐进式披露第三步：点击展开）
             if (ev.data) {
-                html += '<span class="bilibili-study-telemetry-row-expand">▶</span>';
-                html += '<div class="bilibili-study-telemetry-row-detail" style="display:none"><pre>' + _escapeHtml(JSON.stringify(ev.data, null, 2)) + '</pre></div>';
+                html += '<span class="bilibili-study-telemetry-float-row-expand">▶</span>';
+                html += '<div class="bilibili-study-telemetry-float-row-detail" style="display:none"><pre>' + _escapeHtml(JSON.stringify(ev.data, null, 2)) + '</pre></div>';
             }
             html += '</div>';
         }
@@ -5364,21 +5417,21 @@ const TelemetryUI = (function() {
 
         // 加载更多按钮（渐进式披露第四步）
         if (_displayCount < totalEvents) {
-            html += '<div class="bilibili-study-telemetry-more" id="bilibili-study-telemetry-load-more">加载更多（+10）</div>';
+            html += '<div class="bilibili-study-telemetry-float-more" id="bilibili-study-telemetry-float-load-more">加载更多（+10）</div>';
         }
 
         container.innerHTML = html;
 
         // 绑定展开事件
-        var rows = container.querySelectorAll('.bilibili-study-telemetry-row');
+        var rows = container.querySelectorAll('.bilibili-study-telemetry-float-row');
         for (var r = 0; r < rows.length; r++) {
             (function(row) {
-                var expand = row.querySelector('.bilibili-study-telemetry-row-expand');
-                var detail = row.querySelector('.bilibili-study-telemetry-row-detail');
+                var expand = row.querySelector('.bilibili-study-telemetry-float-row-expand');
+                var detail = row.querySelector('.bilibili-study-telemetry-float-row-detail');
                 if (expand && detail) {
                     row.addEventListener('click', function(e) {
                         // 点按钮时不要触发
-                        if (e.target.classList.contains('bilibili-study-telemetry-filter-btn')) return;
+                        if (e.target.classList.contains('bilibili-study-telemetry-float-filter-btn')) return;
                         var isHidden = detail.style.display === 'none' || detail.style.display === '';
                         detail.style.display = isHidden ? 'block' : 'none';
                         expand.textContent = isHidden ? '▼' : '▶';
@@ -5388,7 +5441,7 @@ const TelemetryUI = (function() {
         }
 
         // 绑定筛选事件
-        var filterBtns = container.querySelectorAll('.bilibili-study-telemetry-filter-btn');
+        var filterBtns = container.querySelectorAll('.bilibili-study-telemetry-float-filter-btn');
         for (var f = 0; f < filterBtns.length; f++) {
             (function(btn) {
                 btn.addEventListener('click', function() {
@@ -5401,7 +5454,7 @@ const TelemetryUI = (function() {
         }
 
         // 绑定加载更多
-        var loadMore = container.querySelector('#bilibili-study-telemetry-load-more');
+        var loadMore = container.querySelector('#bilibili-study-telemetry-float-load-more');
         if (loadMore) {
             loadMore.addEventListener('click', function() {
                 _displayCount += 10;
@@ -5420,43 +5473,43 @@ const TelemetryUI = (function() {
         var html = '';
 
         // 本窗口指标
-        html += '<div class="bilibili-study-telemetry-section-title">本窗口指标</div>';
-        html += '<div class="bilibili-study-telemetry-metrics-grid">';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">引导弹窗</span><span class="bilibili-study-telemetry-metric-val">' + metrics.guidePopupsShown + '</span></div>';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">Master选举</span><span class="bilibili-study-telemetry-metric-val">' + metrics.masterElections + '</span></div>';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">自动导航</span><span class="bilibili-study-telemetry-metric-val">' + metrics.autoNavigations + '</span></div>';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">Toast显示</span><span class="bilibili-study-telemetry-metric-val">' + metrics.toastShown + '</span></div>';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">错误事件</span><span class="bilibili-study-telemetry-metric-val">' + metrics.errorEvents + '</span></div>';
-        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">干预触发</span><span class="bilibili-study-telemetry-metric-val">' + metrics.interventionsTriggered + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-section-title">本窗口指标</div>';
+        html += '<div class="bilibili-study-telemetry-float-metrics-grid">';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">引导弹窗</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.guidePopupsShown + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">Master选举</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.masterElections + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">自动导航</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.autoNavigations + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">Toast显示</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.toastShown + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">错误事件</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.errorEvents + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">干预触发</span><span class="bilibili-study-telemetry-float-metric-val">' + metrics.interventionsTriggered + '</span></div>';
         html += '</div>';
 
         // 其他窗口信息（从 tabRegistry 读取）
         if (remoteWindows.length > 0) {
-            html += '<div class="bilibili-study-telemetry-section-title">其他窗口</div>';
+            html += '<div class="bilibili-study-telemetry-float-section-title">其他窗口</div>';
             for (var w = 0; w < remoteWindows.length; w++) {
                 var win = remoteWindows[w];
-                var statusClass = win.isOnline ? 'bilibili-study-telemetry-window-online' : 'bilibili-study-telemetry-window-offline';
-                html += '<div class="bilibili-study-telemetry-window ' + statusClass + '">';
+                var statusClass = win.isOnline ? 'bilibili-study-telemetry-float-window-online' : 'bilibili-study-telemetry-float-window-offline';
+                html += '<div class="bilibili-study-telemetry-float-window ' + statusClass + '">';
                 html += '<span>' + (win.tabId || '').substring(0, 15) + '...</span>';
                 html += '<span>' + (win.isOnline ? '在线' : '离线') + '</span>';
                 html += '<span>' + (win.isWhitelisted ? '学习' : '分心') + '</span>';
                 html += '</div>';
             }
         } else {
-            html += '<div class="bilibili-study-telemetry-section-title">其他窗口</div>';
-            html += '<div class="bilibili-study-telemetry-empty">无其他活跃窗口</div>';
+            html += '<div class="bilibili-study-telemetry-float-section-title">其他窗口</div>';
+            html += '<div class="bilibili-study-telemetry-float-empty">无其他活跃窗口</div>';
         }
 
         // 操作按钮
-        html += '<div class="bilibili-study-telemetry-actions">';
-        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-reset-metrics">重置计数</button>';
-        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-export">导出 JSON</button>';
+        html += '<div class="bilibili-study-telemetry-float-actions">';
+        html += '<button class="bilibili-study-telemetry-float-btn" id="bilibili-study-telemetry-float-reset-metrics">重置计数</button>';
+        html += '<button class="bilibili-study-telemetry-float-btn" id="bilibili-study-telemetry-float-export">导出 JSON</button>';
         html += '</div>';
 
         container.innerHTML = html;
 
         // 绑定重置
-        var resetBtn = container.querySelector('#bilibili-study-telemetry-reset-metrics');
+        var resetBtn = container.querySelector('#bilibili-study-telemetry-float-reset-metrics');
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
                 DebugTelemetry.resetMetrics();
@@ -5465,7 +5518,7 @@ const TelemetryUI = (function() {
         }
 
         // 绑定导出
-        var exportBtn = container.querySelector('#bilibili-study-telemetry-export');
+        var exportBtn = container.querySelector('#bilibili-study-telemetry-float-export');
         if (exportBtn) {
             exportBtn.addEventListener('click', function() {
                 _doExport();
@@ -5473,17 +5526,17 @@ const TelemetryUI = (function() {
         }
     }
 
-    // ── Traces 视图（文本时间线） ──
+    // ── Traces 时间线视图 ──
     function _renderTraces(container) {
         var events = DebugTelemetry.dumpMultiWindowTrace({ windowMs: 30000 });
         var html = '';
 
-        html += '<div class="bilibili-study-telemetry-section-title">多窗口事件流（最近 30 秒）</div>';
+        html += '<div class="bilibili-study-telemetry-float-section-title">多窗口事件流（最近 30 秒）</div>';
 
         if (events.length === 0) {
-            html += '<div class="bilibili-study-telemetry-empty">近 30 秒无多窗口事件</div>';
+            html += '<div class="bilibili-study-telemetry-float-empty">近 30 秒无多窗口事件</div>';
         } else {
-            html += '<div class="bilibili-study-telemetry-timeline">';
+            html += '<div class="bilibili-study-telemetry-float-timeline">';
             for (var i = 0; i < events.length; i++) {
                 var ev = events[i];
                 var time = new Date(ev.ts);
@@ -5491,23 +5544,28 @@ const TelemetryUI = (function() {
                               time.getMinutes().toString().padStart(2,'0') + ':' +
                               time.getSeconds().toString().padStart(2,'0');
                 var catColor = CATEGORY_COLORS[ev.category] || '#6b7280';
-                html += '<div class="bilibili-study-telemetry-trace-item">';
-                html += '<span class="bilibili-study-telemetry-trace-time">' + timeStr + '</span>';
-                html += '<span class="bilibili-study-telemetry-trace-dot" style="background:' + catColor + '"></span>';
-                html += '<span class="bilibili-study-telemetry-trace-text">[' + (CATEGORY_LABELS[ev.category] || ev.category) + '] ' + _escapeHtml(ev.event) + '</span>';
+                html += '<div class="bilibili-study-telemetry-float-trace-item">';
+                html += '<span class="bilibili-study-telemetry-float-trace-time">' + timeStr + '</span>';
+                html += '<span class="bilibili-study-telemetry-float-trace-dot" style="background:' + catColor + '"></span>';
+                html += '<span class="bilibili-study-telemetry-float-trace-text">[' + (CATEGORY_LABELS[ev.category] || ev.category) + '] ' + _escapeHtml(ev.event) + '</span>';
+                // 有 data 时显示摘要
+                if (ev.data) {
+                    var summary = _escapeHtml(JSON.stringify(ev.data).substring(0, 100));
+                    html += '<div class="bilibili-study-telemetry-float-trace-data">' + summary + '</div>';
+                }
                 html += '</div>';
             }
             html += '</div>';
         }
 
         // 刷新按钮
-        html += '<div class="bilibili-study-telemetry-actions">';
-        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-refresh-traces">刷新</button>';
+        html += '<div class="bilibili-study-telemetry-float-actions">';
+        html += '<button class="bilibili-study-telemetry-float-btn" id="bilibili-study-telemetry-float-refresh-traces">刷新</button>';
         html += '</div>';
 
         container.innerHTML = html;
 
-        var refreshBtn = container.querySelector('#bilibili-study-telemetry-refresh-traces');
+        var refreshBtn = container.querySelector('#bilibili-study-telemetry-float-refresh-traces');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function() {
                 _refreshView();
@@ -5577,11 +5635,11 @@ const TelemetryUI = (function() {
 
     // ── 暗色模式 ──
     function _applyDarkMode() {
-        if (!_drawerEl) return;
+        if (!_floatWin) return;
         var isDark = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
                      document.body.classList.contains('bilibili-study-dark-mode');
         if (isDark) {
-            _drawerEl.classList.add('bilibili-study-dark-mode');
+            _floatWin.classList.add('bilibili-study-dark-mode');
         }
     }
 
