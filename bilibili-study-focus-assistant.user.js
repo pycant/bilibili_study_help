@@ -5990,16 +5990,6 @@ const DetailPanel = (function() {
                     hasChanges = true;
                 }
             }
-
-            // v1.3.0: 保存自动导航开关
-            const autoNavToggle = document.getElementById('bilibili-study-auto-navigate-toggle');
-            if (autoNavToggle) {
-                const newAutoNavigate = autoNavToggle.checked;
-                if (newAutoNavigate !== config.autoNavigate) {
-                    ConfigManager.save({ autoNavigate: newAutoNavigate });
-                    hasChanges = true;
-                }
-            }
         }
 
         // 反馈
