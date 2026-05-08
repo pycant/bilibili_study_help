@@ -2209,6 +2209,110 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-telemetry-list {
         border-color: #2a2a2a;
     }
+
+    /* Telemetry Floating Window */
+    .bilibili-study-telemetry-float-window {
+        position: fixed;
+        z-index: 1000010;
+        width: 480px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        right: 20px;
+        top: 80px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
+        color: #333;
+    }
+    .bilibili-study-telemetry-float-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        height: 44px;
+        background: #f8f9fa;
+        border-radius: 12px 12px 0 0;
+        cursor: move;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .bilibili-study-telemetry-float-title {
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+        flex: 1;
+    }
+    .bilibili-study-telemetry-float-close {
+        cursor: pointer;
+        font-size: 18px;
+        color: #999;
+        line-height: 1;
+        padding: 4px;
+    }
+    .bilibili-study-telemetry-float-close:hover {
+        color: #666;
+    }
+    .bilibili-study-telemetry-float-tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .bilibili-study-telemetry-float-tab {
+        flex: 1;
+        padding: 10px;
+        text-align: center;
+        color: #666;
+        cursor: pointer;
+        font-size: 13px;
+    }
+    .bilibili-study-telemetry-float-tab:hover {
+        background: #f3f4f6;
+    }
+    .bilibili-study-telemetry-float-tab.active {
+        color: #3b82f6;
+        border-bottom: 2px solid #3b82f6;
+        font-weight: 500;
+    }
+    .bilibili-study-telemetry-float-body {
+        padding: 12px;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    /* Dark mode dla Telemetry Floating Window */
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-window {
+        background: #1e1e1e;
+        border-color: #333;
+        color: #e0e0e0;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-header {
+        background: #2a2a2a;
+        border-bottom-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-title {
+        color: #e0e0e0;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-close {
+        color: #888;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-close:hover {
+        color: #aaa;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-tabs {
+        border-bottom-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-tab {
+        color: #999;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-tab:hover {
+        background: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-tab.active {
+        color: #60a5fa;
+        border-bottom-color: #60a5fa;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-body {
+        color: #e0e0e0;
+    }
 `;
 
 // Inject CSS
