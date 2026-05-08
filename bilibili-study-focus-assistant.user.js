@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.6.1
+// @version      1.2.6.2
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -2549,6 +2549,7 @@ const TabManager = (function() {
     let guideCountdownInterval = null; // 倒计时 setInterval
     let lastGuideResolvedAt = 0;       // 上次用户处理引导弹窗的时间戳（冷却期用）
     let lastMultiWindowState = false;  // 上一 tick 的多窗口状态
+    let _mixedWindowStableCount = 0;   // 【v1.2.6.2】连续检测到 mixed 状态的次数（稳定性去抖）
 
     // ── 注册表操作 ──
 
@@ -2594,10 +2595,15 @@ const TabManager = (function() {
     function updateRegistration(data) {
         const tabs = getRegistry();
         const myEntry = tabs[TAB_ID];
+        // 【v1.2.6.2】增加 isVisible 字段，标记当前标签页是否在前台可见
+        const enriched = Object.assign({}, data, {
+            lastHeartbeat: Date.now(),
+            isVisible: !document.hidden
+        });
         if (myEntry) {
-            Object.assign(myEntry, data, { lastHeartbeat: Date.now() });
+            Object.assign(myEntry, enriched);
         } else {
-            tabs[TAB_ID] = { ...data, lastHeartbeat: Date.now(), registeredAt: Date.now() };
+            tabs[TAB_ID] = { ...enriched, registeredAt: Date.now() };
         }
         saveRegistry(tabs);
 
@@ -2606,12 +2612,15 @@ const TabManager = (function() {
         if (now - _lastRegistrationLogTime > 30000) {
             _lastRegistrationLogTime = now;
             const activeCount = getActiveTabCount();
-            console.log('[B站学习助手] TabManager: 注册状态', {
+            const visibleCount = getVisibleTabCount();
+            DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'registration_status', {
                 tabId: TAB_ID.substring(0, 12) + '...',
                 bv: (data.bv || '').substring(0, 10) + '...',
                 isWhitelisted: data.isWhitelisted,
+                isVisible: enriched.isVisible,
                 isMaster: isMaster,
                 activeTabs: activeCount,
+                visibleTabs: visibleCount,
                 isPaused: _isPaused,
                 documentHidden: document.hidden
             });
@@ -2654,7 +2663,10 @@ const TabManager = (function() {
         } catch (e) { /* ignore */ }
         isMaster = true;
         masterClaimTime = now;
-        console.log('[B站学习助手] TabManager: 成为主窗口', TAB_ID);
+        DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'claimMaster', {
+            tabId: TAB_ID.substring(0, 12) + '...',
+            claimedAt: new Date(now).toLocaleTimeString()
+        });
     }
 
     // 释放 Master
@@ -2672,7 +2684,10 @@ const TabManager = (function() {
             } catch (e) { /* ignore */ }
             isMaster = false;
             masterClaimTime = 0;
-            console.log('[B站学习助手] TabManager: 释放主窗口', TAB_ID);
+            DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'releaseMaster', {
+                tabId: TAB_ID.substring(0, 12) + '...',
+                reason: 'visibility_change_or_focus_lost'
+            });
         }
     }
 
@@ -2749,20 +2764,27 @@ const TabManager = (function() {
             if (document.hidden) {
                 // 页面隐藏：如果是 Master 且已持有超过最小持有时间，则释放
                 if (isMaster && Date.now() - masterClaimTime > MIN_MASTER_HOLD_MS) {
-                    console.log('[B站学习助手] TabManager: 页面隐藏，释放主窗口', TAB_ID);
+                    DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'visibility_hidden_release_master', {
+                        holdTime: Date.now() - masterClaimTime + 'ms',
+                        activeTabs: _getActiveTabDetails()
+                    });
                     releaseMaster();
                 } else {
-                    console.log('[B站学习助手] TabManager: 页面隐藏，保持当前状态', {
+                    DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'visibility_hidden_keep_state', {
                         isMaster: isMaster,
                         holdTime: Date.now() - masterClaimTime + 'ms'
                     });
                 }
+                // 【v1.2.6.2】页面隐藏后立即更新注册表中的 isVisible
+                updateRegistration({ isVisible: false });
             } else {
                 // 页面可见：尝试接管 Master
-                console.log('[B站学习助手] TabManager: 页面可见，尝试选举');
+                DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'visibility_visible_attempt_elect', {});
                 // 短延迟避免快速切换时的竞态
                 setTimeout(function() {
                     elect();
+                    // 【v1.2.6.2】页面恢复可见后立即更新 isVisible
+                    updateRegistration({ isVisible: true });
                 }, 200);
             }
         });
@@ -2822,7 +2844,23 @@ const TabManager = (function() {
         return count;
     }
 
+    // 【v1.2.6.2】获取当前可见标签页数量（排除后台隐藏的标签页）
+    function getVisibleTabCount() {
+        const tabs = getRegistry();
+        const now = Date.now();
+        let count = 0;
+        for (const tabId in tabs) {
+            if (now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) continue;
+            // isVisible 为 true 或者未定义（兼容旧数据）时视为可见
+            if (tabs[tabId].isVisible !== false) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     // 检测是否存在不同类型的窗口（1学+1分）
+    // 【v1.2.6.2】仅考虑当前可见的标签页，排除后台隐藏标签页的残余注册信息
     function hasMixedWindowTypes() {
         const tabs = getRegistry();
         const now = Date.now();
@@ -2830,8 +2868,14 @@ const TabManager = (function() {
         let hasDistraction = false;
         const studyList = [];
         const distractList = [];
+        const skippedHidden = [];
         for (const tabId in tabs) {
             if (now - tabs[tabId].lastHeartbeat > HEARTBEAT_TIMEOUT) continue;
+            // 【v1.2.6.2】跳过后台隐藏标签页——它们的 isWhitelisted 状态可能已过时
+            if (tabs[tabId].isVisible === false) {
+                skippedHidden.push(tabId.substring(0, 12) + '...');
+                continue;
+            }
             if (tabs[tabId].isWhitelisted) {
                 hasStudy = true;
                 studyList.push(tabId.substring(0, 12) + '...');
@@ -2840,13 +2884,18 @@ const TabManager = (function() {
                 distractList.push(tabId.substring(0, 12) + '...');
             }
         }
-        if (hasStudy && hasDistraction) {
-            console.log('[B站学习助手] TabManager: hasMixedWindowTypes=true', {
+        const result = hasStudy && hasDistraction;
+        if (result || skippedHidden.length > 0) {
+            DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'hasMixedWindowTypes', {
+                result: result,
                 studyTabs: studyList,
-                distractionTabs: distractList
+                distractionTabs: distractList,
+                skippedHidden: skippedHidden.length > 0 ? skippedHidden : undefined,
+                totalTabsInRegistry: Object.keys(tabs).length,
+                visibleTabCount: getVisibleTabCount()
             });
         }
-        return hasStudy && hasDistraction;
+        return result;
     }
 
     // 获取当前是否处于多窗口场景
@@ -2865,20 +2914,38 @@ const TabManager = (function() {
 
             // 检测到多窗口状态变化
             if (multiNow !== lastMultiWindowState) {
-                console.log('[B站学习助手] TabManager: 多窗口状态变化', multiNow ? '进入多窗口' : '退出多窗口', {
+                DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'multi_window_state_change', {
+                    state: multiNow ? '进入多窗口' : '退出多窗口',
                     activeTabs: _getActiveTabDetails(),
                     mixedTypes: mixedNow,
                     inCooldown: inCooldown,
-                    documentHidden: document.hidden
+                    documentHidden: document.hidden,
+                    mixedWindowStableCount: _mixedWindowStableCount
                 });
                 lastMultiWindowState = multiNow;
+            }
+
+            // 【v1.2.6.2】2-cycle 稳定性去抖：mixed 状态必须连续出现 2 次以上才触发引导
+            // 过滤瞬态场景（后台标签页的残余注册信息在几秒内自动消失）
+            if (mixedNow) {
+                _mixedWindowStableCount++;
+                if (_mixedWindowStableCount > 10) _mixedWindowStableCount = 10; // 封顶
+            } else {
+                if (_mixedWindowStableCount > 0) {
+                    DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'mixed_window_stable_reset', {
+                        previousStableCount: _mixedWindowStableCount
+                    });
+                }
+                _mixedWindowStableCount = 0;
             }
 
             // 只在"不同类型窗口并存"时触发引导
             // Bug修复：当前窗口在后台时不弹引导（用户看不到，反而打断前台窗口）
             // Bug修复：冷却期内不再重复触发
-            if (multiNow && mixedNow && !isGuideActive && !inCooldown && !document.hidden) {
-                console.log('[B站学习助手] TabManager: 检测到不同类型窗口并存，触发引导', {
+            // 【v1.2.6.2】增加稳定性去抖：_mixedWindowStableCount >= 2
+            if (multiNow && mixedNow && !isGuideActive && !inCooldown && !document.hidden && _mixedWindowStableCount >= 2) {
+                DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'trigger_guide', {
+                    stableCount: _mixedWindowStableCount,
                     activeTabs: _getActiveTabDetails(),
                     currentTab: TAB_ID,
                     currentBV: PageMonitor.getCurrentBV(),
@@ -2890,6 +2957,10 @@ const TabManager = (function() {
 
             // 如果不再是多窗口，关闭引导
             if (!multiNow && isGuideActive) {
+                DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'window_resolved_close_guide', {
+                    reason: 'no_longer_multi_window',
+                    activeTabs: _getActiveTabDetails()
+                });
                 dismissGuide('window_resolved');
             }
         }, MULTI_WINDOW_CHECK_INTERVAL);
@@ -2909,11 +2980,14 @@ const TabManager = (function() {
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
 
-        console.log('[B站学习助手] TabManager: triggerMultiWindowGuide', {
+        // 【v1.2.6.2】触发引导时自动捕获状态快照（方便后查瞬态场景）
+        DebugTelemetry.captureSnapshot('trigger_guide');
+        DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'triggerMultiWindowGuide', {
             currentTab: TAB_ID,
             currentBV: currentBV,
             isWhitelisted: isWhitelisted,
-            activeTabs: _getActiveTabDetails()
+            activeTabs: _getActiveTabDetails(),
+            stableCount: _mixedWindowStableCount
         });
 
         if (isWhitelisted) {
@@ -3082,7 +3156,8 @@ const TabManager = (function() {
 
     // 处理引导选择
     function _handleGuideChoice(choice) {
-        console.log('[B站学习助手] TabManager: _handleGuideChoice', choice, {
+        DebugTelemetry.logUserAction('guide_choice', {
+            choice: choice,
             isGuideActive: isGuideActive,
             isMaster: isMaster,
             isPaused: _isPaused,
@@ -3194,16 +3269,27 @@ const TabManager = (function() {
         // 用户做出选择后，冷却期内不再重复触发引导弹窗
         lastGuideResolvedAt = Date.now();
 
-        console.log('[B站学习助手] TabManager: 引导弹窗关闭, reason=', reason, {
-            isMultiWindow: isMultiWindow(),
-            hasMixedTypes: hasMixedWindowTypes(),
+        // 【v1.2.6.2】记录引导关闭时的上下文的快照
+        const currentMulti = isMultiWindow();
+        const currentMixed = hasMixedWindowTypes();
+        DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'dismissGuide', {
+            reason: reason,
+            isMultiWindow: currentMulti,
+            hasMixedTypes: currentMixed,
+            activeTabs: _getActiveTabDetails(),
             cooldownUntil: new Date(lastGuideResolvedAt + GUIDE_COOLDOWN_MS).toLocaleTimeString()
         });
+        // 如果引导在短时间内关闭（< 10秒），可能是一次瞬态触发，自动捕获快照
+        if (reason === 'window_resolved') {
+            DebugTelemetry.captureSnapshot('dismiss_guide_window_resolved');
+        }
 
         // 如果不再是多窗口，恢复计时
-        if (!isMultiWindow()) {
+        if (!currentMulti) {
             _setPaused(false);
-            console.log('[B站学习助手] TabManager: 多窗口已解决，恢复计时, reason=', reason);
+            DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'resume_timer', {
+                reason: reason
+            });
         }
 
         // 更新浮窗
@@ -3356,6 +3442,261 @@ const TabManager = (function() {
         releaseMaster,
         dismissGuide,
         isGuideActive: function() { return isGuideActive; }
+    };
+})();
+
+// ==========================================
+// DebugTelemetry Module (v1.2.6.2 新增)
+// ==========================================
+// 轻量级可观测性系统，用于捕获瞬态 Bug 的关键上下文
+// 三层架构：事件日志（环形缓冲） + 状态快照 + 导出分析
+const DebugTelemetry = (function() {
+    // ── 配置 ──
+    const MAX_EVENTS = 500;           // 环形缓冲上限
+    const TELEMETRY_KEY = 'bilibiliStudy_telemetry';
+    const MAX_SNAPSHOTS = 20;         // localStorage 保留快照数
+
+    // 事件分类
+    const CATEGORY = {
+        STATE:        'STATE',        // 状态变更
+        MULTI_TAB:    'MULTI_TAB',    // 多窗口相关
+        INTERVENTION: 'INTERVENTION', // 干预相关
+        TIMING:       'TIMING',       // 定时器/心跳
+        ERROR:        'ERROR',        // 异常
+        PERF:         'PERF',         // 性能
+        USER_ACTION:  'USER_ACTION',  // 用户交互
+        SNAPSHOT:     'SNAPSHOT'      // 快照事件
+    };
+
+    // ── 环形缓冲（内存） ──
+    const _events = [];
+    let _eventId = 0;
+
+    // ── 核心 API：记录事件 ──
+    // category: CATEGORY 常量之一
+    // event:    事件名称（如 'hasMixedWindowTypes'）
+    // data:     附加数据对象（自动 JSON 序列化）
+    function log(category, event, data) {
+        const entry = {
+            id: ++_eventId,
+            ts: Date.now(),
+            tsISO: new Date().toISOString(),
+            category: category,
+            event: event,
+            data: data || null
+        };
+        _events.push(entry);
+        if (_events.length > MAX_EVENTS) _events.shift();
+
+        // 控制台输出带颜色标记
+        const prefix = {
+            STATE:        '[📊TELE/STATE]',
+            MULTI_TAB:    '[🖥️TELE/MULTI]',
+            INTERVENTION: '[⚠️TELE/INTV]',
+            TIMING:       '[⏱️TELE/TIME]',
+            ERROR:        '[❌TELE/ERR]',
+            PERF:         '[⚡TELE/PERF]',
+            USER_ACTION:  '[👤TELE/USER]',
+            SNAPSHOT:     '[📸TELE/SNAP]'
+        }[category] || '[TELE]';
+        console.log(prefix, event, data || '');
+
+        return entry;
+    }
+
+    // ── 状态快照 ──
+    // 捕获当前所有关键上下文，存入 localStorage
+    function captureSnapshot(reason) {
+        const snapshot = {
+            capturedAt: Date.now(),
+            capturedAtISO: new Date().toISOString(),
+            reason: reason,
+            // 全局状态
+            globalState: window.__bilibiliStudyAppState ? { ...window.__bilibiliStudyAppState } : null,
+            // TabManager 注册表
+            tabRegistry: _getRegistrySnapshot(),
+            // 当前页面的可见性/焦点状态
+            pageState: {
+                hidden: document.hidden,
+                hasFocus: document.hasFocus(),
+                url: location.href,
+                title: document.title,
+                bv: typeof PageMonitor !== 'undefined' && PageMonitor.getCurrentBV ? PageMonitor.getCurrentBV() : ''
+            },
+            // 本地配置快照（摘要）
+            configSnapshot: _getConfigSnapshot(),
+            // 最近事件摘要
+            recentEvents: _events.slice(-20)
+        };
+
+        // 存入 localStorage
+        _saveSnapshot(snapshot);
+        log(CATEGORY.SNAPSHOT, 'capture', { reason: reason, snapshotId: snapshot.capturedAt });
+
+        return snapshot;
+    }
+
+    // 获取注册表快照（脱敏处理）
+    function _getRegistrySnapshot() {
+        try {
+            const stored = localStorage.getItem('bilibiliStudy_tabRegistry');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                const summary = {};
+                for (const tabId in (parsed.tabs || {})) {
+                    const tab = parsed.tabs[tabId];
+                    summary[tabId.substring(0, 12) + '...'] = {
+                        bv: (tab.bv || '').substring(0, 10) + '...',
+                        isWhitelisted: tab.isWhitelisted,
+                        isVisible: tab.isVisible,
+                        isStudying: tab.isStudying,
+                        age: tab.lastHeartbeat ? Math.round((Date.now() - tab.lastHeartbeat) / 1000) + 's' : '?'
+                    };
+                }
+                return summary;
+            }
+        } catch (e) { /* ignore */ }
+        return {};
+    }
+
+    // 获取配置摘要
+    function _getConfigSnapshot() {
+        try {
+            const stored = localStorage.getItem('bilibiliStudyAssistant_config');
+            if (stored) {
+                const config = JSON.parse(stored);
+                return {
+                    whitelistCount: (config.whitelist || []).length,
+                    studyPeriods: config.studyPeriods ? config.studyPeriods.length + '个时段' : '无',
+                    interventionLevel: config.interventionLevel || 'standard'
+                };
+            }
+        } catch (e) { /* ignore */ }
+        return {};
+    }
+
+    // 保存快照到 localStorage
+    function _saveSnapshot(snapshot) {
+        try {
+            let snapshots = [];
+            const stored = localStorage.getItem(TELEMETRY_KEY);
+            if (stored) {
+                try { snapshots = JSON.parse(stored); } catch(e) { snapshots = []; }
+            }
+            snapshots.push(snapshot);
+            // FIFO：只保留最新的 MAX_SNAPSHOTS 条
+            while (snapshots.length > MAX_SNAPSHOTS) snapshots.shift();
+            localStorage.setItem(TELEMETRY_KEY, JSON.stringify(snapshots));
+        } catch (e) {
+            console.warn('[B站学习助手] DebugTelemetry: 保存快照失败', e);
+        }
+    }
+
+    // ── 查询与分析 ──
+
+    // 获取所有事件
+    function getEvents() {
+        return _events;
+    }
+
+    // 按条件筛选事件
+    // filterBy: { category, eventPattern, since, until }
+    function query(filterBy) {
+        return _events.filter(function(e) {
+            if (filterBy.category && e.category !== filterBy.category) return false;
+            if (filterBy.eventPattern && !e.event.includes(filterBy.eventPattern)) return false;
+            if (filterBy.since && e.ts < filterBy.since) return false;
+            if (filterBy.until && e.ts > filterBy.until) return false;
+            return true;
+        });
+    }
+
+    // 提取多窗口相关事件链（用于诊断瞬态多窗口状态）
+    function dumpMultiWindowTrace(options) {
+        options = options || {};
+        const windowMs = options.windowMs || 15000;  // 默认 15 秒窗口
+        const since = Date.now() - windowMs;
+        return _events.filter(function(e) {
+            return e.ts >= since && (
+                e.category === CATEGORY.MULTI_TAB ||
+                e.category === CATEGORY.SNAPSHOT ||
+                (e.category === CATEGORY.STATE && e.event.includes('multiWindow'))
+            );
+        });
+    }
+
+    // ── 导出 ──
+
+    // 以 JSON 字符串导出所有事件
+    function exportJSON() {
+        return JSON.stringify({
+            exportedAt: new Date().toISOString(),
+            totalEvents: _events.length,
+            events: _events
+        }, null, 2);
+    }
+
+    // 从 localStorage 获取所有保存的快照
+    function getSavedSnapshots() {
+        try {
+            const stored = localStorage.getItem(TELEMETRY_KEY);
+            if (stored) return JSON.parse(stored);
+        } catch (e) { /* ignore */ }
+        return [];
+    }
+
+    // 清除 localStorage 中的快照
+    function clearSnapshots() {
+        try {
+            localStorage.removeItem(TELEMETRY_KEY);
+        } catch (e) { /* ignore */ }
+    }
+
+    // ── 便利封装 ──
+
+    // 创建拦截器：替换 console.log 使其同时写入 telemetry
+    // 注意：这里不替换原始 console，而是提供辅助函数
+    function logState(event, data) { return log(CATEGORY.STATE, event, data); }
+    function logMultiTab(event, data) { return log(CATEGORY.MULTI_TAB, event, data); }
+    function logIntervention(event, data) { return log(CATEGORY.INTERVENTION, event, data); }
+    function logTiming(event, data) { return log(CATEGORY.TIMING, event, data); }
+    function logError(event, data) { return log(CATEGORY.ERROR, event, data); }
+    function logUserAction(event, data) { return log(CATEGORY.USER_ACTION, event, data); }
+
+    // ── 全局挂载 ──
+    // 挂载到 unsafeWindow 方便控制台调试
+    try {
+        if (typeof unsafeWindow !== 'undefined') {
+            unsafeWindow.__bilibiliStudyDebugTelemetry = {
+                log: log,
+                snapshot: captureSnapshot,
+                query: query,
+                exportJSON: exportJSON,
+                dumpMultiWindowTrace: dumpMultiWindowTrace,
+                getEvents: getEvents,
+                getSavedSnapshots: getSavedSnapshots,
+                clearSnapshots: clearSnapshots,
+                CATEGORY: CATEGORY
+            };
+        }
+    } catch (e) { /* ignore */ }
+
+    return {
+        log: log,
+        logState: logState,
+        logMultiTab: logMultiTab,
+        logIntervention: logIntervention,
+        logTiming: logTiming,
+        logError: logError,
+        logUserAction: logUserAction,
+        captureSnapshot: captureSnapshot,
+        query: query,
+        dumpMultiWindowTrace: dumpMultiWindowTrace,
+        exportJSON: exportJSON,
+        getEvents: getEvents,
+        getSavedSnapshots: getSavedSnapshots,
+        clearSnapshots: clearSnapshots,
+        CATEGORY: CATEGORY
     };
 })();
 
