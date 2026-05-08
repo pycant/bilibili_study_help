@@ -3832,6 +3832,8 @@ const TabManager = (function() {
                     name: videoName
                 });
                 ConfigManager.save(config);
+                // v1.4.1
+                DebugTelemetry.incrementMetric('whiteListChanges');
                 whitelistAdded = true;
                 console.log('[B站学习助手] TabManager: 已将当前视频添加到白名单', currentBV, videoName);
                 // Bug修复：白名单添加成功后给用户反馈
@@ -3884,6 +3886,9 @@ const TabManager = (function() {
                 _setPaused(false);
                 break;
         }
+
+        // v1.4.1
+        DebugTelemetry.incrementMetric('userActions');
     }
 
     // 成为副窗口
@@ -4226,12 +4231,18 @@ const DebugTelemetry = (function() {
     // ── 【v1.4.0】指标计数器 ──
     // 用于 Telemetry Dashboard 的 Metrics 视图
     const _metrics = {
-        guidePopupsShown: 0,      // 引导弹窗显示次数
-        masterElections: 0,       // Master 选举次数
-        autoNavigations: 0,       // 自动导航触发次数
-        toastShown: 0,            // Toast 显示次数
-        errorEvents: 0,           // 错误事件次数
-        interventionsTriggered: 0 // 干预触发次数
+        guidePopupsShown: 0,       // 引导弹窗显示次数（已有）
+        masterElections: 0,        // Master 选举次数（已有）
+        autoNavigations: 0,        // 自动导航触发次数（已有）
+        toastShown: 0,             // Toast 显示次数（已有）
+        errorEvents: 0,            // 错误事件次数（已有）
+        interventionsTriggered: 0, // 干预触发次数（已有）
+        // v1.4.1 新增
+        userActions: 0,            // 用户操作总次数
+        settingsChanges: 0,        // 配置修改次数
+        whiteListChanges: 0,       // 白名单增删次数
+        wordsAttempted: 0,         // 单词验证尝试次数
+        wordsMastered: 0           // 新学会的单词数
     };
 
     // ── 【v1.4.0】指标计数器操作 ──
@@ -7082,6 +7093,8 @@ const DetailPanel = (function() {
         closeSettings();
 
         if (hasChanges) {
+            // v1.4.1
+            DebugTelemetry.incrementMetric('settingsChanges');
             showSettingsToast('✅ 配置已保存，正在刷新面板…', 'success');
             // 刷新详情面板
             setTimeout(() => {
@@ -8521,6 +8534,9 @@ const InterventionController = (function() {
             return; // 空输入不处理
         }
 
+        // v1.4.1
+        DebugTelemetry.incrementMetric('wordsAttempted');
+
         const correct = WordVerifier.checkAnswer(currentWord, answer);
         console.log('[B站学习助手]   correct=', correct, 'target=', currentWord.english, 'answer=', answer);
 
@@ -8538,6 +8554,8 @@ const InterventionController = (function() {
             // v1.2.4 fix: 答对时才记录最终结果
             WordVerifier.recordAnswer(currentWord, true);
             StatisticsTracker.recordWordAttempt(true);
+            // v1.4.1
+            DebugTelemetry.incrementMetric('wordsMastered');
             feedback.innerHTML = `<span style="color: ${isDark ? '#4ade80' : '#16a34a'}; font-weight: bold;">✅ 回答正确！</span>`;
             // 正确答案直接关闭
             setTimeout(() => {
