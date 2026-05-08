@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.2.7
+// @version      1.3.0
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
