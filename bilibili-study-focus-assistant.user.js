@@ -1856,6 +1856,359 @@ const STYLES = `
         background: rgba(17,17,17,0.95) !important;
         color: #e0e0e0 !important;
     }
+
+    /* ── Telemetry Dashboard (v1.4.0) ── */
+    .bilibili-study-telemetry-drawer {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 420px;
+        height: 100%;
+        background: #fff;
+        border-left: 1px solid #e5e7eb;
+        box-shadow: -4px 0 12px rgba(0,0,0,0.1);
+        z-index: 100;
+        font-size: 13px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .bilibili-study-telemetry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .bilibili-study-telemetry-title {
+        font-size: 15px;
+        font-weight: 500;
+        color: #111;
+    }
+    .bilibili-study-telemetry-close {
+        cursor: pointer;
+        font-size: 18px;
+        color: #666;
+        padding: 4px;
+    }
+    .bilibili-study-telemetry-close:hover {
+        color: #111;
+    }
+    .bilibili-study-telemetry-tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .bilibili-study-telemetry-tab {
+        flex: 1;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+        font-size: 13px;
+        color: #666;
+        border-bottom: 2px solid transparent;
+    }
+    .bilibili-study-telemetry-tab.active {
+        color: #3b82f6;
+        border-bottom-color: #3b82f6;
+    }
+    .bilibili-study-telemetry-content {
+        flex: 1;
+        padding: 12px;
+        overflow-y: auto;
+    }
+    .bilibili-study-telemetry-loading {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+    .bilibili-study-telemetry-filter {
+        margin-bottom: 8px;
+    }
+    .bilibili-study-telemetry-filter-label {
+        font-size: 12px;
+        color: #888;
+        margin-right: 4px;
+    }
+    .bilibili-study-telemetry-filter-btn {
+        display: inline-block;
+        padding: 2px 8px;
+        margin: 2px;
+        font-size: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #f3f4f6;
+        color: #555;
+        border: 1px solid transparent;
+    }
+    .bilibili-study-telemetry-filter-btn.active {
+        background: #3b82f6;
+        color: #fff;
+    }
+    .bilibili-study-telemetry-summary {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 8px;
+        padding: 4px 0;
+    }
+    .bilibili-study-telemetry-list {
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+    }
+    .bilibili-study-telemetry-row {
+        padding: 6px 10px;
+        border-bottom: 1px solid #f5f5f5;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .bilibili-study-telemetry-row:last-child {
+        border-bottom: none;
+    }
+    .bilibili-study-telemetry-row:hover {
+        background: #f9fafb;
+    }
+    .bilibili-study-telemetry-row-error {
+        background: #fef2f2;
+    }
+    .bilibili-study-telemetry-row-error:hover {
+        background: #fee2e2;
+    }
+    .bilibili-study-telemetry-row-time {
+        font-size: 11px;
+        color: #999;
+        font-family: monospace;
+        min-width: 58px;
+    }
+    .bilibili-study-telemetry-row-cat {
+        font-size: 11px;
+        font-weight: 500;
+        min-width: 50px;
+    }
+    .bilibili-study-telemetry-row-event {
+        font-size: 12px;
+        color: #333;
+        flex: 1;
+    }
+    .bilibili-study-telemetry-row-expand {
+        font-size: 10px;
+        color: #aaa;
+        margin-left: auto;
+    }
+    .bilibili-study-telemetry-row-detail {
+        width: 100%;
+        margin-top: 4px;
+    }
+    .bilibili-study-telemetry-row-detail pre {
+        font-size: 11px;
+        background: #f5f5f5;
+        padding: 8px;
+        border-radius: 4px;
+        overflow-x: auto;
+        max-height: 200px;
+        color: #333;
+    }
+    .bilibili-study-telemetry-more {
+        text-align: center;
+        padding: 8px;
+        color: #3b82f6;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .bilibili-study-telemetry-more:hover {
+        background: #f9fafb;
+    }
+    .bilibili-study-telemetry-section-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: #444;
+        padding: 8px 0 4px;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 8px;
+    }
+    .bilibili-study-telemetry-metrics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .bilibili-study-telemetry-metric {
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+    }
+    .bilibili-study-telemetry-metric-label {
+        display: block;
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 4px;
+    }
+    .bilibili-study-telemetry-metric-val {
+        display: block;
+        font-size: 22px;
+        font-weight: 500;
+        color: #3b82f6;
+    }
+    .bilibili-study-telemetry-window {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: #555;
+    }
+    .bilibili-study-telemetry-window-online {
+        border-left: 3px solid #22c55e;
+    }
+    .bilibili-study-telemetry-window-offline {
+        border-left: 3px solid #ef4444;
+    }
+    .bilibili-study-telemetry-empty {
+        text-align: center;
+        padding: 20px;
+        color: #aaa;
+        font-size: 12px;
+    }
+    .bilibili-study-telemetry-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+    }
+    .bilibili-study-telemetry-btn {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 12px;
+        color: #444;
+    }
+    .bilibili-study-telemetry-btn:hover {
+        background: #f3f4f6;
+    }
+    .bilibili-study-telemetry-timeline {
+        padding: 4px 0;
+    }
+    .bilibili-study-telemetry-trace-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        font-size: 12px;
+    }
+    .bilibili-study-telemetry-trace-time {
+        font-family: monospace;
+        font-size: 11px;
+        color: #999;
+        min-width: 58px;
+    }
+    .bilibili-study-telemetry-trace-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .bilibili-study-telemetry-trace-text {
+        color: #444;
+    }
+    /* Dark mode dla Telemetry Dashboard */
+    .bilibili-study-dark-mode .bilibili-study-telemetry-drawer {
+        background: #1e1e1e;
+        border-left-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-title {
+        color: #e0e0e0;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-close {
+        color: #999;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-close:hover {
+        color: #fff;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-header {
+        border-bottom-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-tabs {
+        border-bottom-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-tab {
+        color: #999;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row {
+        border-bottom-color: #2a2a2a;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row:hover {
+        background: #252525;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row-event {
+        color: #ccc;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row-error {
+        background: #2a1515;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row-error:hover {
+        background: #3a1a1a;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-section-title {
+        color: #ccc;
+        border-bottom-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-metric {
+        border-color: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-metric-label {
+        color: #999;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-window {
+        border-color: #333;
+        color: #aaa;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-empty {
+        color: #666;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-btn {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #ccc;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-btn:hover {
+        background: #333;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-filter-btn {
+        background: #333;
+        color: #aaa;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-filter-btn.active {
+        background: #3b82f6;
+        color: #fff;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-summary {
+        color: #888;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-trace-text {
+        color: #bbb;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-row-detail pre {
+        background: #252525;
+        color: #ccc;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-more {
+        color: #60a5fa;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-more:hover {
+        background: #252525;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-loading {
+        color: #666;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-list {
+        border-color: #2a2a2a;
+    }
 `;
 
 // Inject CSS
@@ -2815,6 +3168,10 @@ const TabManager = (function() {
             tabId: TAB_ID.substring(0, 12) + '...',
             claimedAt: new Date(now).toLocaleTimeString()
         });
+        // 【v1.4.0】指标
+        if (typeof DebugTelemetry !== 'undefined' && DebugTelemetry.incrementMetric) {
+            DebugTelemetry.incrementMetric('masterElections');
+        }
         // 【v1.2.7】通过 BroadcastChannel 广播 Master 声明
         if (syncChannel) {
             try {
@@ -3162,8 +3519,12 @@ const TabManager = (function() {
         const currentBV = PageMonitor.getCurrentBV();
         const isWhitelisted = ConfigManager.isWhitelisted(currentBV);
 
-        // 【v1.2.6.2】触发引导时自动捕获状态快照（方便后查瞬态场景）
+        // 【v1.4.0】触发引导时自动捕获状态快照并计数
         DebugTelemetry.captureSnapshot('trigger_guide');
+        if (typeof DebugTelemetry.incrementMetric === 'function') {
+            DebugTelemetry.incrementMetric('guidePopupsShown');
+            DebugTelemetry.incrementMetric('interventionsTriggered');
+        }
         DebugTelemetry.log(DebugTelemetry.CATEGORY.MULTI_TAB, 'triggerMultiWindowGuide', {
             currentTab: TAB_ID,
             currentBV: currentBV,
@@ -3581,6 +3942,10 @@ const TabManager = (function() {
     var _toastTimerId = null;
     var _toastStartTime = 0;
     function _showGuideToast(message) {
+        // 【v1.4.0】指标
+        if (typeof DebugTelemetry.incrementMetric === 'function') {
+            DebugTelemetry.incrementMetric('toastShown');
+        }
         // 复用已有的 Toast 逻辑（如果存在），否则创建简单的临时 Toast
         let toast = document.getElementById('bilibili-study-guide-toast');
         if (!toast) {
@@ -3754,6 +4119,39 @@ const DebugTelemetry = (function() {
     const _events = [];
     let _eventId = 0;
 
+    // ── 【v1.4.0】指标计数器 ──
+    // 用于 Telemetry Dashboard 的 Metrics 视图
+    const _metrics = {
+        guidePopupsShown: 0,      // 引导弹窗显示次数
+        masterElections: 0,       // Master 选举次数
+        autoNavigations: 0,       // 自动导航触发次数
+        toastShown: 0,            // Toast 显示次数
+        errorEvents: 0,           // 错误事件次数
+        interventionsTriggered: 0 // 干预触发次数
+    };
+
+    // ── 【v1.4.0】指标计数器操作 ──
+    // 增加指定计数器的值
+    function incrementMetric(name) {
+        if (_metrics.hasOwnProperty(name)) {
+            _metrics[name]++;
+        }
+    }
+
+    // 获取所有指标计数器的当前值
+    function getMetrics() {
+        return { ..._metrics };
+    }
+
+    // 重置所有指标计数器
+    function resetMetrics() {
+        for (var key in _metrics) {
+            if (_metrics.hasOwnProperty(key)) {
+                _metrics[key] = 0;
+            }
+        }
+    }
+
     // ── 核心 API：记录事件 ──
     // category: CATEGORY 常量之一
     // event:    事件名称（如 'hasMixedWindowTypes'）
@@ -3770,7 +4168,10 @@ const DebugTelemetry = (function() {
         _events.push(entry);
         if (_events.length > MAX_EVENTS) _events.shift();
 
-        // 控制台输出带颜色标记
+        // 【v1.4.0】自动统计错误事件
+        if (category === CATEGORY.ERROR) {
+            _metrics.errorEvents++;
+        }
         const prefix = {
             STATE:        '[📊TELE/STATE]',
             MULTI_TAB:    '[🖥️TELE/MULTI]',
@@ -3909,13 +4310,31 @@ const DebugTelemetry = (function() {
 
     // ── 导出 ──
 
-    // 以 JSON 字符串导出所有事件
+    // 以 JSON 字符串导出所有事件 + 指标 + 快照
     function exportJSON() {
         return JSON.stringify({
+            schemaVersion: '1.0',
             exportedAt: new Date().toISOString(),
-            totalEvents: _events.length,
-            events: _events
+            source: {
+                tabId: typeof TAB_ID !== 'undefined' ? TAB_ID : '',
+                windowTitle: document.title
+            },
+            telemetry: {
+                totalEvents: _events.length,
+                events: _events,
+                metrics: _metrics,
+                snapshotCount: _getSnapshotCount()
+            }
         }, null, 2);
+    }
+
+    // 获取保存的快照数量
+    function _getSnapshotCount() {
+        try {
+            var stored = localStorage.getItem(TELEMETRY_KEY);
+            if (stored) return JSON.parse(stored).length;
+        } catch (e) { /* ignore */ }
+        return 0;
     }
 
     // 从 localStorage 获取所有保存的快照
@@ -3958,7 +4377,11 @@ const DebugTelemetry = (function() {
                 getEvents: getEvents,
                 getSavedSnapshots: getSavedSnapshots,
                 clearSnapshots: clearSnapshots,
-                CATEGORY: CATEGORY
+                CATEGORY: CATEGORY,
+                // 【v1.4.0】指标
+                incrementMetric: incrementMetric,
+                getMetrics: getMetrics,
+                resetMetrics: resetMetrics
             };
         }
     } catch (e) { /* ignore */ }
@@ -3978,7 +4401,11 @@ const DebugTelemetry = (function() {
         getEvents: getEvents,
         getSavedSnapshots: getSavedSnapshots,
         clearSnapshots: clearSnapshots,
-        CATEGORY: CATEGORY
+        CATEGORY: CATEGORY,
+        // 【v1.4.0】指标
+        incrementMetric: incrementMetric,
+        getMetrics: getMetrics,
+        resetMetrics: resetMetrics
     };
 })();
 
@@ -4600,6 +5027,462 @@ const FloatingWindow = (function() {
         getPosition: getCurrentPosition,
         setOnPanelOpen,
         destroy
+    };
+})();
+
+// ==========================================
+// TelemetryUI Module (v1.4.0 新增)
+// ==========================================
+// 调试面板：Logs/Metrics/Traces 三视图，集成到 DetailPanel
+// 数据来源：DebugTelemetry（事件日志+指标+快照）
+const TelemetryUI = (function() {
+    let _drawerEl = null;        // 抽屉面板 DOM
+    let _activeView = 'logs';    // 当前视图: logs | metrics | traces
+    let _refreshTimer = null;    // 自动刷新定时器
+    let _displayCount = 10;      // 当前显示的事件条数（渐进式）
+    let _currentFilter = null;   // 当前筛选条件 { category, eventPattern }
+    let _autoSaveTimer = null;   // 自动保存定时器
+    let _autoSaveInterval = 300000; // 默认5分钟
+
+    // 分类中文名映射（方便你看懂）
+    var CATEGORY_LABELS = {
+        STATE:        '状态',
+        MULTI_TAB:    '多窗口',
+        INTERVENTION: '干预',
+        TIMING:       '计时',
+        ERROR:        '错误',
+        PERF:         '性能',
+        USER_ACTION:  '用户操作',
+        SNAPSHOT:     '快照'
+    };
+
+    // 分类颜色映射
+    var CATEGORY_COLORS = {
+        STATE:        '#3b82f6',  // 蓝色
+        MULTI_TAB:    '#8b5cf6',  // 紫色
+        INTERVENTION: '#f59e0b',  // 橙色
+        TIMING:       '#10b981',  // 绿色
+        ERROR:        '#ef4444',  // 红色
+        PERF:         '#6366f1',  // 靛蓝
+        USER_ACTION:  '#ec4899',  // 粉色
+        SNAPSHOT:     '#6b7280'   // 灰色
+    };
+
+    // ── 主入口：打开调试面板 ──
+    function open() {
+        // 如果已存在则直接显示
+        if (_drawerEl) {
+            _drawerEl.style.display = 'block';
+            _refreshView();
+            return;
+        }
+
+        // 创建抽屉面板
+        _drawerEl = document.createElement('div');
+        _drawerEl.id = 'bilibili-study-telemetry-drawer';
+        _drawerEl.innerHTML = `
+            <div class="bilibili-study-telemetry-header">
+                <span class="bilibili-study-telemetry-title">🔍 调试面板</span>
+                <span class="bilibili-study-telemetry-close" id="bilibili-study-telemetry-close">✕</span>
+            </div>
+            <div class="bilibili-study-telemetry-tabs">
+                <span class="bilibili-study-telemetry-tab active" data-view="logs">📋 日志</span>
+                <span class="bilibili-study-telemetry-tab" data-view="metrics">📊 指标</span>
+                <span class="bilibili-study-telemetry-tab" data-view="traces">🔗 追踪</span>
+            </div>
+            <div class="bilibili-study-telemetry-content" id="bilibili-study-telemetry-content">
+                <div class="bilibili-study-telemetry-loading">加载中...</div>
+            </div>
+        `;
+
+        var panel = DetailPanel._getModalElement ? DetailPanel._getModalElement() : document.querySelector('.bilibili-study-modal');
+        if (panel) {
+            panel.appendChild(_drawerEl);
+        } else {
+            document.body.appendChild(_drawerEl);
+        }
+
+        // 绑定事件
+        _drawerEl.querySelector('#bilibili-study-telemetry-close').addEventListener('click', close);
+        var tabs = _drawerEl.querySelectorAll('.bilibili-study-telemetry-tab');
+        for (var i = 0; i < tabs.length; i++) {
+            (function(tab) {
+                tab.addEventListener('click', function() {
+                    var view = this.getAttribute('data-view');
+                    switchView(view);
+                });
+            })(tabs[i]);
+        }
+
+        // 应用暗色模式
+        _applyDarkMode();
+
+        // 首次渲染
+        _displayCount = 10;
+        _currentFilter = null;
+        _refreshView();
+
+        // 启动自动刷新（每5秒）
+        if (_refreshTimer) clearInterval(_refreshTimer);
+        _refreshTimer = setInterval(_refreshView, 5000);
+
+        // 启动自动保存
+        _startAutoSave();
+    }
+
+    // ── 关闭调试面板 ──
+    function close() {
+        if (_refreshTimer) {
+            clearInterval(_refreshTimer);
+            _refreshTimer = null;
+        }
+        if (_autoSaveTimer) {
+            clearInterval(_autoSaveTimer);
+            _autoSaveTimer = null;
+        }
+        if (_drawerEl) {
+            _drawerEl.style.display = 'none';
+        }
+    }
+
+    // ── 彻底销毁 ──
+    function destroy() {
+        close();
+        if (_drawerEl) {
+            _drawerEl.remove();
+            _drawerEl = null;
+        }
+    }
+
+    // ── 切换视图 ──
+    function switchView(viewName) {
+        _activeView = viewName;
+        _displayCount = 10;  // 切换视图时重置显示条数
+        _currentFilter = null;
+
+        // 更新 tab 高亮
+        if (_drawerEl) {
+            var tabs = _drawerEl.querySelectorAll('.bilibili-study-telemetry-tab');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+                if (tabs[i].getAttribute('data-view') === viewName) {
+                    tabs[i].classList.add('active');
+                }
+            }
+        }
+        _refreshView();
+    }
+
+    // ── 刷新当前视图 ──
+    function _refreshView() {
+        if (!_drawerEl) return;
+        var content = _drawerEl.querySelector('#bilibili-study-telemetry-content');
+        if (!content) return;
+
+        switch (_activeView) {
+            case 'logs':    _renderLogs(content);    break;
+            case 'metrics': _renderMetrics(content); break;
+            case 'traces':  _renderTraces(content);  break;
+        }
+    }
+
+    // ── Logs 视图（渐进式披露） ──
+    function _renderLogs(container) {
+        var events = DebugTelemetry.getEvents();
+        // 如果有筛选条件
+        var filtered = events;
+        if (_currentFilter) {
+            filtered = DebugTelemetry.query(_currentFilter);
+        }
+
+        var totalEvents = filtered.length;
+        var displayEvents = filtered.slice(-_displayCount);
+        var errorCount = 0;
+        for (var i = 0; i < filtered.length; i++) {
+            if (filtered[i].category === 'ERROR') errorCount++;
+        }
+
+        var html = '';
+        // 筛选栏
+        html += '<div class="bilibili-study-telemetry-filter">';
+        html += '<span class="bilibili-study-telemetry-filter-label">筛选:</span> ';
+        var cats = ['', 'STATE', 'MULTI_TAB', 'INTERVENTION', 'ERROR', 'USER_ACTION'];
+        for (var c = 0; c < cats.length; c++) {
+            var cat = cats[c];
+            var label = cat ? (CATEGORY_LABELS[cat] || cat) : '全部';
+            var active = (!_currentFilter && !cat) || (_currentFilter && _currentFilter.category === cat) ? ' active' : '';
+            html += '<span class="bilibili-study-telemetry-filter-btn' + active + '" data-cat="' + cat + '">' + label + '</span>';
+        }
+        html += '</div>';
+
+        // 概要栏（渐进式披露第一步：先看总数）
+        html += '<div class="bilibili-study-telemetry-summary">';
+        html += '总计 ' + totalEvents + ' 条 | 当前显示 ' + _displayCount + ' 条 | 错误 ' + errorCount + ' 条';
+        html += '</div>';
+
+        // 事件列表（渐进式披露第二步：逐条截断）
+        html += '<div class="bilibili-study-telemetry-list">';
+        for (var e = displayEvents.length - 1; e >= 0; e--) {
+            var ev = displayEvents[e];
+            var time = new Date(ev.ts);
+            var timeStr = time.getHours().toString().padStart(2,'0') + ':' +
+                          time.getMinutes().toString().padStart(2,'0') + ':' +
+                          time.getSeconds().toString().padStart(2,'0');
+            var catColor = CATEGORY_COLORS[ev.category] || '#6b7280';
+            var catLabel = CATEGORY_LABELS[ev.category] || ev.category;
+            var isError = ev.category === 'ERROR';
+            var rowClass = isError ? ' bilibili-study-telemetry-row-error' : '';
+
+            // 每行只显示：时间 + 分类标签 + 事件名（渐进式披露）
+            html += '<div class="bilibili-study-telemetry-row' + rowClass + '" data-idx="' + e + '">';
+            html += '<span class="bilibili-study-telemetry-row-time">' + timeStr + '</span>';
+            html += '<span class="bilibili-study-telemetry-row-cat" style="color:' + catColor + '">[' + catLabel + ']</span>';
+            html += '<span class="bilibili-study-telemetry-row-event">' + _escapeHtml(ev.event) + '</span>';
+            // 有 data 时显示展开箭头（渐进式披露第三步：点击展开）
+            if (ev.data) {
+                html += '<span class="bilibili-study-telemetry-row-expand">▶</span>';
+                html += '<div class="bilibili-study-telemetry-row-detail" style="display:none"><pre>' + _escapeHtml(JSON.stringify(ev.data, null, 2)) + '</pre></div>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // 加载更多按钮（渐进式披露第四步）
+        if (_displayCount < totalEvents) {
+            html += '<div class="bilibili-study-telemetry-more" id="bilibili-study-telemetry-load-more">加载更多（+10）</div>';
+        }
+
+        container.innerHTML = html;
+
+        // 绑定展开事件
+        var rows = container.querySelectorAll('.bilibili-study-telemetry-row');
+        for (var r = 0; r < rows.length; r++) {
+            (function(row) {
+                var expand = row.querySelector('.bilibili-study-telemetry-row-expand');
+                var detail = row.querySelector('.bilibili-study-telemetry-row-detail');
+                if (expand && detail) {
+                    row.addEventListener('click', function(e) {
+                        // 点按钮时不要触发
+                        if (e.target.classList.contains('bilibili-study-telemetry-filter-btn')) return;
+                        var isHidden = detail.style.display === 'none' || detail.style.display === '';
+                        detail.style.display = isHidden ? 'block' : 'none';
+                        expand.textContent = isHidden ? '▼' : '▶';
+                    });
+                }
+            })(rows[r]);
+        }
+
+        // 绑定筛选事件
+        var filterBtns = container.querySelectorAll('.bilibili-study-telemetry-filter-btn');
+        for (var f = 0; f < filterBtns.length; f++) {
+            (function(btn) {
+                btn.addEventListener('click', function() {
+                    var cat = this.getAttribute('data-cat');
+                    _currentFilter = cat ? { category: cat } : null;
+                    _displayCount = 10;
+                    _refreshView();
+                });
+            })(filterBtns[f]);
+        }
+
+        // 绑定加载更多
+        var loadMore = container.querySelector('#bilibili-study-telemetry-load-more');
+        if (loadMore) {
+            loadMore.addEventListener('click', function() {
+                _displayCount += 10;
+                _refreshView();
+            });
+        }
+    }
+
+    // ── Metrics 视图 ──
+    function _renderMetrics(container) {
+        var metrics = DebugTelemetry.getMetrics();
+
+        // 从 tabRegistry 获取其他窗口信息
+        var remoteWindows = _getRemoteWindowInfo();
+
+        var html = '';
+
+        // 本窗口指标
+        html += '<div class="bilibili-study-telemetry-section-title">本窗口指标</div>';
+        html += '<div class="bilibili-study-telemetry-metrics-grid">';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">引导弹窗</span><span class="bilibili-study-telemetry-metric-val">' + metrics.guidePopupsShown + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">Master选举</span><span class="bilibili-study-telemetry-metric-val">' + metrics.masterElections + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">自动导航</span><span class="bilibili-study-telemetry-metric-val">' + metrics.autoNavigations + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">Toast显示</span><span class="bilibili-study-telemetry-metric-val">' + metrics.toastShown + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">错误事件</span><span class="bilibili-study-telemetry-metric-val">' + metrics.errorEvents + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-metric"><span class="bilibili-study-telemetry-metric-label">干预触发</span><span class="bilibili-study-telemetry-metric-val">' + metrics.interventionsTriggered + '</span></div>';
+        html += '</div>';
+
+        // 其他窗口信息（从 tabRegistry 读取）
+        if (remoteWindows.length > 0) {
+            html += '<div class="bilibili-study-telemetry-section-title">其他窗口</div>';
+            for (var w = 0; w < remoteWindows.length; w++) {
+                var win = remoteWindows[w];
+                var statusClass = win.isOnline ? 'bilibili-study-telemetry-window-online' : 'bilibili-study-telemetry-window-offline';
+                html += '<div class="bilibili-study-telemetry-window ' + statusClass + '">';
+                html += '<span>' + (win.tabId || '').substring(0, 15) + '...</span>';
+                html += '<span>' + (win.isOnline ? '在线' : '离线') + '</span>';
+                html += '<span>' + (win.isWhitelisted ? '学习' : '分心') + '</span>';
+                html += '</div>';
+            }
+        } else {
+            html += '<div class="bilibili-study-telemetry-section-title">其他窗口</div>';
+            html += '<div class="bilibili-study-telemetry-empty">无其他活跃窗口</div>';
+        }
+
+        // 操作按钮
+        html += '<div class="bilibili-study-telemetry-actions">';
+        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-reset-metrics">重置计数</button>';
+        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-export">导出 JSON</button>';
+        html += '</div>';
+
+        container.innerHTML = html;
+
+        // 绑定重置
+        var resetBtn = container.querySelector('#bilibili-study-telemetry-reset-metrics');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                DebugTelemetry.resetMetrics();
+                _refreshView();
+            });
+        }
+
+        // 绑定导出
+        var exportBtn = container.querySelector('#bilibili-study-telemetry-export');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', function() {
+                _doExport();
+            });
+        }
+    }
+
+    // ── Traces 视图（文本时间线） ──
+    function _renderTraces(container) {
+        var events = DebugTelemetry.dumpMultiWindowTrace({ windowMs: 30000 });
+        var html = '';
+
+        html += '<div class="bilibili-study-telemetry-section-title">多窗口事件流（最近 30 秒）</div>';
+
+        if (events.length === 0) {
+            html += '<div class="bilibili-study-telemetry-empty">近 30 秒无多窗口事件</div>';
+        } else {
+            html += '<div class="bilibili-study-telemetry-timeline">';
+            for (var i = 0; i < events.length; i++) {
+                var ev = events[i];
+                var time = new Date(ev.ts);
+                var timeStr = time.getHours().toString().padStart(2,'0') + ':' +
+                              time.getMinutes().toString().padStart(2,'0') + ':' +
+                              time.getSeconds().toString().padStart(2,'0');
+                var catColor = CATEGORY_COLORS[ev.category] || '#6b7280';
+                html += '<div class="bilibili-study-telemetry-trace-item">';
+                html += '<span class="bilibili-study-telemetry-trace-time">' + timeStr + '</span>';
+                html += '<span class="bilibili-study-telemetry-trace-dot" style="background:' + catColor + '"></span>';
+                html += '<span class="bilibili-study-telemetry-trace-text">[' + (CATEGORY_LABELS[ev.category] || ev.category) + '] ' + _escapeHtml(ev.event) + '</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        // 刷新按钮
+        html += '<div class="bilibili-study-telemetry-actions">';
+        html += '<button class="bilibili-study-telemetry-btn" id="bilibili-study-telemetry-refresh-traces">刷新</button>';
+        html += '</div>';
+
+        container.innerHTML = html;
+
+        var refreshBtn = container.querySelector('#bilibili-study-telemetry-refresh-traces');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                _refreshView();
+            });
+        }
+    }
+
+    // ── 从 tabRegistry 获取其他窗口信息 ──
+    function _getRemoteWindowInfo() {
+        try {
+            var stored = localStorage.getItem('bilibiliStudy_tabRegistry');
+            if (!stored) return [];
+            var parsed = JSON.parse(stored);
+            var tabs = parsed.tabs || {};
+            var result = [];
+            var myTabId = typeof TabManager !== 'undefined' && TabManager.TAB_ID ? TabManager.TAB_ID : '';
+            var now = Date.now();
+            for (var tabId in tabs) {
+                if (tabId === myTabId) continue;
+                var tab = tabs[tabId];
+                var age = now - (tab.lastHeartbeat || 0);
+                result.push({
+                    tabId: tabId,
+                    isOnline: age < 8000,
+                    isWhitelisted: tab.isWhitelisted,
+                    isVisible: tab.isVisible,
+                    bv: tab.bv || ''
+                });
+            }
+            return result;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // ── 导出 ──
+    function _doExport() {
+        var json = DebugTelemetry.exportJSON();
+        var now = new Date();
+        var filename = 'bilibili-telemetry-' +
+            now.getFullYear() + '-' +
+            (now.getMonth()+1).toString().padStart(2,'0') + '-' +
+            now.getDate().toString().padStart(2,'0') + '-' +
+            now.getHours().toString().padStart(2,'0') +
+            now.getMinutes().toString().padStart(2,'0') +
+            now.getSeconds().toString().padStart(2,'0') + '.json';
+
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // ── 自动保存 ──
+    function _startAutoSave() {
+        if (_autoSaveTimer) clearInterval(_autoSaveTimer);
+        // 默认每5分钟自动保存一次
+        _autoSaveTimer = setInterval(function() {
+            _doExport();
+        }, _autoSaveInterval);
+    }
+
+    // ── 暗色模式 ──
+    function _applyDarkMode() {
+        if (!_drawerEl) return;
+        var isDark = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
+                     document.body.classList.contains('bilibili-study-dark-mode');
+        if (isDark) {
+            _drawerEl.classList.add('bilibili-study-dark-mode');
+        }
+    }
+
+    // ── HTML 转义 ──
+    function _escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        var div = document.createElement('div');
+        div.textContent = typeof str === 'string' ? str : String(str);
+        return div.innerHTML;
+    }
+
+    return {
+        open: open,
+        close: close,
+        destroy: destroy,
+        switchView: switchView
     };
 })();
 
@@ -5233,6 +6116,12 @@ const DetailPanel = (function() {
                             ⚙️ 设置
                         </button>
                         <button class="bilibili-study-btn bilibili-study-btn-secondary" 
+                                id="bilibili-study-open-telemetry"
+                                style="padding: 6px 12px; font-size: 14px; cursor: pointer;"
+                                title="调试面板">
+                            🔍 调试
+                        </button>
+                        <button class="bilibili-study-btn bilibili-study-btn-secondary" 
                                 id="bilibili-study-theme-toggle"
                                 style="padding: 6px 12px; font-size: 18px; cursor: pointer;"
                                 title="切换主题">
@@ -5284,6 +6173,15 @@ const DetailPanel = (function() {
             settingsBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 openSettings();
+            });
+        }
+
+        // Telemetry button (v1.4.0)
+        const telemetryBtn = document.getElementById('bilibili-study-open-telemetry');
+        if (telemetryBtn) {
+            telemetryBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                TelemetryUI.open();
             });
         }
 
@@ -6876,6 +7774,10 @@ const InterventionController = (function() {
 
         const targetBV = ConfigManager.getDefaultReturnBV();
         if (targetBV) {
+            // 【v1.4.0】指标
+            if (typeof DebugTelemetry.incrementMetric === 'function') {
+                DebugTelemetry.incrementMetric('autoNavigations');
+            }
             window.location.href = `https://www.bilibili.com/video/${targetBV}`;
         }
     }
