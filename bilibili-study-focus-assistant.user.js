@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站学习专注提醒助手
 // @namespace    https://github.com/bilibili-study-focus
-// @version      1.3.0
+// @version      1.3.1
 // @description  A Tampermonkey script that provides progressive, non-intrusive focus interventions during user-defined study periods on Bilibili video pages
 // @author       Your Name
 // @match        *://www.bilibili.com/video/BV*
@@ -1769,6 +1769,93 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-multi-tab-guide-icon {
         filter: brightness(1.1);
     }
+
+    /* Auto-navigate Toast */
+    .bilibili-study-auto-nav-toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .bilibili-study-auto-nav-inner {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(255, 255, 255, 0.97);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 10px;
+        padding: 12px 18px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        backdrop-filter: blur(12px);
+        color: #333;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        min-width: 300px;
+        animation: vocabToastIn 0.25s ease-out;
+    }
+
+    .bilibili-study-auto-nav-icon {
+        font-size: 16px;
+    }
+
+    .bilibili-study-auto-nav-text {
+        flex: 1;
+        font-size: 14px;
+    }
+
+    .bilibili-study-auto-nav-countdown {
+        color: #3b82f6;
+    }
+
+    .bilibili-study-auto-nav-cancel {
+        background: none;
+        border: 1px solid #dc2626;
+        color: #dc2626;
+        border-radius: 6px;
+        padding: 4px 12px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    /* Guide Toast */
+    .bilibili-study-guide-toast {
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        z-index: 1000010;
+        background: rgba(34,139,34,0.9);
+        color: #fff;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        transition: opacity 0.2s ease-in-out;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Dark mode - Auto-navigate Toast */
+    .bilibili-study-dark-mode .bilibili-study-auto-nav-inner {
+        background: rgba(30, 35, 45, 0.97) !important;
+        color: #e0e0e0 !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-auto-nav-countdown {
+        color: #60a5fa !important;
+    }
+
+    .bilibili-study-dark-mode .bilibili-study-auto-nav-cancel {
+        border-color: #f87171 !important;
+        color: #f87171 !important;
+    }
+
+    /* Dark mode - Guide Toast */
+    .bilibili-study-dark-mode .bilibili-study-guide-toast {
+        background: rgba(17,17,17,0.95) !important;
+        color: #e0e0e0 !important;
+    }
 `;
 
 // Inject CSS
@@ -3499,15 +3586,7 @@ const TabManager = (function() {
         if (!toast) {
             toast = document.createElement('div');
             toast.id = 'bilibili-study-guide-toast';
-            // 【v1.2.7】暗色模式适配
-            var _isDarkToast = document.documentElement.classList.contains('bilibili-study-dark-mode') ||
-                               document.body.classList.contains('bilibili-study-dark-mode');
-            var _toastBg = _isDarkToast ? 'rgba(17,17,17,0.95)' : 'rgba(34,139,34,0.9)';
-            var _toastColor = _isDarkToast ? '#e0e0e0' : '#fff';
-            toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
-                'padding:10px 20px;border-radius:10px;font-size:14px;z-index:1000010;' +
-                'background:' + _toastBg + ';color:' + _toastColor + ';box-shadow:0 2px 12px rgba(0,0,0,0.3);' +
-                'transition:opacity 0.2s ease-in-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+            toast.className = 'bilibili-study-guide-toast';
             document.body.appendChild(toast);
         }
         toast.textContent = message;
@@ -6819,52 +6898,22 @@ const InterventionController = (function() {
         let countdown = 3;
         let cancelled = false;
         let countdownTimer = null;
-        const isDark = (typeof DetailPanel !== 'undefined' && typeof DetailPanel.getCurrentTheme === 'function')
-            ? DetailPanel.getCurrentTheme() === 'dark'
-            : false;
-
-        const bg = isDark ? 'rgba(30, 35, 45, 0.97)' : 'rgba(255, 255, 255, 0.97)';
-        const textColor = isDark ? '#e0e0e0' : '#333';
-        const accentColor = isDark ? '#60a5fa' : '#3b82f6';
-        const cancelColor = isDark ? '#f87171' : '#dc2626';
 
         const toast = document.createElement('div');
         toast.id = 'bilibili-study-auto-navigate-toast';
+        toast.className = 'bilibili-study-auto-nav-toast';
         toast.innerHTML = `
-            <div style="
-                display: flex; align-items: center; gap: 12px;
-                background: ${bg};
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 10px;
-                padding: 12px 18px;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-                backdrop-filter: blur(12px);
-                color: ${textColor};
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                min-width: 300px;
-                animation: vocabToastIn 0.25s ease-out;
-            ">
-                <span style="font-size:16px;">⏰</span>
-                <span style="flex:1; font-size: 14px;">
-                    即将跳转到学习视频 <strong id="bilibili-study-countdown-num" style="color:${accentColor};">${countdown}</strong>s
+            <div class="bilibili-study-auto-nav-inner">
+                <span class="bilibili-study-auto-nav-icon">⏰</span>
+                <span class="bilibili-study-auto-nav-text">
+                    即将跳转到学习视频 <strong id="bilibili-study-countdown-num" class="bilibili-study-auto-nav-countdown">${countdown}</strong>s
                 </span>
-                <button id="bilibili-study-auto-nav-cancel" style="
-                    background: none; border: 1px solid ${cancelColor}; color: ${cancelColor};
-                    border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 13px;
-                    font-weight: 500;
-                ">取消</button>
+                <button id="bilibili-study-auto-nav-cancel" class="bilibili-study-auto-nav-cancel">取消</button>
             </div>
-        `;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000002;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         `;
 
         document.body.appendChild(toast);
+        ModalManager.register('auto-nav-toast', ModalManager.LEVELS.TOAST, toast);
 
         // 取消按钮
         document.getElementById('bilibili-study-auto-nav-cancel').addEventListener('click', function() {
