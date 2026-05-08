@@ -1857,359 +1857,6 @@ const STYLES = `
         color: #e0e0e0 !important;
     }
 
-    /* ── Telemetry Dashboard (v1.4.0) ── */
-    .bilibili-study-telemetry-drawer {
-        position: absolute;
-        right: 0;
-        top: 0;
-        width: 420px;
-        height: 100%;
-        background: #fff;
-        border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 12px rgba(0,0,0,0.1);
-        z-index: 100;
-        font-size: 13px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-    }
-    .bilibili-study-telemetry-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 16px;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    .bilibili-study-telemetry-title {
-        font-size: 15px;
-        font-weight: 500;
-        color: #111;
-    }
-    .bilibili-study-telemetry-close {
-        cursor: pointer;
-        font-size: 18px;
-        color: #666;
-        padding: 4px;
-    }
-    .bilibili-study-telemetry-close:hover {
-        color: #111;
-    }
-    .bilibili-study-telemetry-tabs {
-        display: flex;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    .bilibili-study-telemetry-tab {
-        flex: 1;
-        padding: 10px;
-        text-align: center;
-        cursor: pointer;
-        font-size: 13px;
-        color: #666;
-        border-bottom: 2px solid transparent;
-    }
-    .bilibili-study-telemetry-tab.active {
-        color: #3b82f6;
-        border-bottom-color: #3b82f6;
-    }
-    .bilibili-study-telemetry-content {
-        flex: 1;
-        padding: 12px;
-        overflow-y: auto;
-    }
-    .bilibili-study-telemetry-loading {
-        text-align: center;
-        padding: 40px;
-        color: #999;
-    }
-    .bilibili-study-telemetry-filter {
-        margin-bottom: 8px;
-    }
-    .bilibili-study-telemetry-filter-label {
-        font-size: 12px;
-        color: #888;
-        margin-right: 4px;
-    }
-    .bilibili-study-telemetry-filter-btn {
-        display: inline-block;
-        padding: 2px 8px;
-        margin: 2px;
-        font-size: 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        background: #f3f4f6;
-        color: #555;
-        border: 1px solid transparent;
-    }
-    .bilibili-study-telemetry-filter-btn.active {
-        background: #3b82f6;
-        color: #fff;
-    }
-    .bilibili-study-telemetry-summary {
-        font-size: 12px;
-        color: #888;
-        margin-bottom: 8px;
-        padding: 4px 0;
-    }
-    .bilibili-study-telemetry-list {
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-    }
-    .bilibili-study-telemetry-row {
-        padding: 6px 10px;
-        border-bottom: 1px solid #f5f5f5;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
-    }
-    .bilibili-study-telemetry-row:last-child {
-        border-bottom: none;
-    }
-    .bilibili-study-telemetry-row:hover {
-        background: #f9fafb;
-    }
-    .bilibili-study-telemetry-row-error {
-        background: #fef2f2;
-    }
-    .bilibili-study-telemetry-row-error:hover {
-        background: #fee2e2;
-    }
-    .bilibili-study-telemetry-row-time {
-        font-size: 11px;
-        color: #999;
-        font-family: monospace;
-        min-width: 58px;
-    }
-    .bilibili-study-telemetry-row-cat {
-        font-size: 11px;
-        font-weight: 500;
-        min-width: 50px;
-    }
-    .bilibili-study-telemetry-row-event {
-        font-size: 12px;
-        color: #333;
-        flex: 1;
-    }
-    .bilibili-study-telemetry-row-expand {
-        font-size: 10px;
-        color: #aaa;
-        margin-left: auto;
-    }
-    .bilibili-study-telemetry-row-detail {
-        width: 100%;
-        margin-top: 4px;
-    }
-    .bilibili-study-telemetry-row-detail pre {
-        font-size: 11px;
-        background: #f5f5f5;
-        padding: 8px;
-        border-radius: 4px;
-        overflow-x: auto;
-        max-height: 200px;
-        color: #333;
-    }
-    .bilibili-study-telemetry-more {
-        text-align: center;
-        padding: 8px;
-        color: #3b82f6;
-        cursor: pointer;
-        font-size: 12px;
-    }
-    .bilibili-study-telemetry-more:hover {
-        background: #f9fafb;
-    }
-    .bilibili-study-telemetry-section-title {
-        font-size: 13px;
-        font-weight: 500;
-        color: #444;
-        padding: 8px 0 4px;
-        border-bottom: 1px solid #f0f0f0;
-        margin-bottom: 8px;
-    }
-    .bilibili-study-telemetry-metrics-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-bottom: 12px;
-    }
-    .bilibili-study-telemetry-metric {
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-        padding: 10px;
-        text-align: center;
-    }
-    .bilibili-study-telemetry-metric-label {
-        display: block;
-        font-size: 11px;
-        color: #888;
-        margin-bottom: 4px;
-    }
-    .bilibili-study-telemetry-metric-val {
-        display: block;
-        font-size: 22px;
-        font-weight: 500;
-        color: #3b82f6;
-    }
-    .bilibili-study-telemetry-window {
-        display: flex;
-        justify-content: space-between;
-        padding: 6px 10px;
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-        margin-bottom: 4px;
-        font-size: 12px;
-        color: #555;
-    }
-    .bilibili-study-telemetry-window-online {
-        border-left: 3px solid #22c55e;
-    }
-    .bilibili-study-telemetry-window-offline {
-        border-left: 3px solid #ef4444;
-    }
-    .bilibili-study-telemetry-empty {
-        text-align: center;
-        padding: 20px;
-        color: #aaa;
-        font-size: 12px;
-    }
-    .bilibili-study-telemetry-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 12px;
-    }
-    .bilibili-study-telemetry-btn {
-        flex: 1;
-        padding: 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        background: #fff;
-        cursor: pointer;
-        font-size: 12px;
-        color: #444;
-    }
-    .bilibili-study-telemetry-btn:hover {
-        background: #f3f4f6;
-    }
-    .bilibili-study-telemetry-timeline {
-        padding: 4px 0;
-    }
-    .bilibili-study-telemetry-trace-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 0;
-        font-size: 12px;
-    }
-    .bilibili-study-telemetry-trace-time {
-        font-family: monospace;
-        font-size: 11px;
-        color: #999;
-        min-width: 58px;
-    }
-    .bilibili-study-telemetry-trace-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-    .bilibili-study-telemetry-trace-text {
-        color: #444;
-    }
-    /* Dark mode dla Telemetry Dashboard */
-    .bilibili-study-dark-mode .bilibili-study-telemetry-drawer {
-        background: #1e1e1e;
-        border-left-color: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-title {
-        color: #e0e0e0;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-close {
-        color: #999;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-close:hover {
-        color: #fff;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-header {
-        border-bottom-color: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-tabs {
-        border-bottom-color: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-tab {
-        color: #999;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row {
-        border-bottom-color: #2a2a2a;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row:hover {
-        background: #252525;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row-event {
-        color: #ccc;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row-error {
-        background: #2a1515;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row-error:hover {
-        background: #3a1a1a;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-section-title {
-        color: #ccc;
-        border-bottom-color: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-metric {
-        border-color: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-metric-label {
-        color: #999;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-window {
-        border-color: #333;
-        color: #aaa;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-empty {
-        color: #666;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-btn {
-        background: #2a2a2a;
-        border-color: #444;
-        color: #ccc;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-btn:hover {
-        background: #333;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-filter-btn {
-        background: #333;
-        color: #aaa;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-filter-btn.active {
-        background: #3b82f6;
-        color: #fff;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-summary {
-        color: #888;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-trace-text {
-        color: #bbb;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-row-detail pre {
-        background: #252525;
-        color: #ccc;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-more {
-        color: #60a5fa;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-more:hover {
-        background: #252525;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-loading {
-        color: #666;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-list {
-        border-color: #2a2a2a;
-    }
-
     /* Telemetry Floating Window */
     .bilibili-study-telemetry-float-window {
         position: fixed;
@@ -2312,6 +1959,69 @@ const STYLES = `
     }
     .bilibili-study-dark-mode .bilibili-study-telemetry-float-body {
         color: #e0e0e0;
+    }
+    /* 其他窗口卡片样式（v1.4.1） */
+    .bilibili-study-telemetry-float-remote-window {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: #555;
+    }
+    .bilibili-study-telemetry-float-remote-online {
+        border-left: 3px solid #22c55e;
+    }
+    .bilibili-study-telemetry-float-remote-offline {
+        border-left: 3px solid #ef4444;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-remote-window {
+        border-color: #333;
+        color: #aaa;
+    }
+    /* Traces 视图样式（v1.4.1） */
+    .bilibili-study-telemetry-float-timeline {
+        padding: 4px 0;
+    }
+    .bilibili-study-telemetry-float-trace-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        font-size: 12px;
+    }
+    .bilibili-study-telemetry-float-trace-time {
+        font-family: monospace;
+        font-size: 11px;
+        color: #999;
+        min-width: 58px;
+    }
+    .bilibili-study-telemetry-float-trace-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .bilibili-study-telemetry-float-trace-text {
+        color: #444;
+    }
+    .bilibili-study-telemetry-float-trace-data {
+        width: 100%;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #888;
+        padding: 4px 8px;
+        background: #f9f9f9;
+        border-radius: 4px;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-trace-text {
+        color: #bbb;
+    }
+    .bilibili-study-dark-mode .bilibili-study-telemetry-float-trace-data {
+        background: #2a2a2a;
+        color: #999;
     }
 `;
 
@@ -5230,7 +4940,7 @@ const TelemetryUI = (function() {
         // 创建浮动窗口
         _floatWin = document.createElement('div');
         _floatWin.id = 'bilibili-study-telemetry-float';
-        _floatWin.className = 'bilibili-study-telemetry-float';
+        _floatWin.className = 'bilibili-study-telemetry-float-window';
         _floatWin.innerHTML = `
             <div class="bilibili-study-telemetry-float-header">
                 <span class="bilibili-study-telemetry-float-title">🔍 调试面板</span>
@@ -5488,8 +5198,8 @@ const TelemetryUI = (function() {
             html += '<div class="bilibili-study-telemetry-float-section-title">其他窗口</div>';
             for (var w = 0; w < remoteWindows.length; w++) {
                 var win = remoteWindows[w];
-                var statusClass = win.isOnline ? 'bilibili-study-telemetry-float-window-online' : 'bilibili-study-telemetry-float-window-offline';
-                html += '<div class="bilibili-study-telemetry-float-window ' + statusClass + '">';
+                var statusClass = win.isOnline ? 'bilibili-study-telemetry-float-remote-online' : 'bilibili-study-telemetry-float-remote-offline';
+                html += '<div class="bilibili-study-telemetry-float-remote-window ' + statusClass + '">';
                 html += '<span>' + (win.tabId || '').substring(0, 15) + '...</span>';
                 html += '<span>' + (win.isOnline ? '在线' : '离线') + '</span>';
                 html += '<span>' + (win.isWhitelisted ? '学习' : '分心') + '</span>';
