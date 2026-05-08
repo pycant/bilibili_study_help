@@ -6610,11 +6610,11 @@ const DetailPanel = (function() {
                 <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">关闭分心弹窗后显示3秒倒计时，结束后自动跳转到白名单视频</p>
                 <div class="bilibili-study-settings-option-group">
                     <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="autoNavigate" value="true" ${autoNavigate ? 'checked' : ''}>
+                        <input type="radio" name="autoNavigate" value="true" ${config.autoNavigate ? 'checked' : ''}>
                         <span>✅ 开启</span>
                     </label>
                     <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="autoNavigate" value="false" ${!autoNavigate ? 'checked' : ''}>
+                        <input type="radio" name="autoNavigate" value="false" ${!config.autoNavigate ? 'checked' : ''}>
                         <span>❌ 关闭</span>
                     </label>
                 </div>
