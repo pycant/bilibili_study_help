@@ -5627,6 +5627,21 @@ const DetailPanel = (function() {
                     <span class="bilibili-study-reset-label">分钟后重置</span>
                 </div>
             </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🚀 自动导航（P0）</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">关闭分心弹窗后显示3秒倒计时，结束后自动跳转到白名单视频</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="autoNavigate" value="true" ${autoNavigate ? 'checked' : ''}>
+                        <span>✅ 开启</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="autoNavigate" value="false" ${!autoNavigate ? 'checked' : ''}>
+                        <span>❌ 关闭</span>
+                    </label>
+                </div>
+            </div>
         `;
     }
 
@@ -5962,6 +5977,16 @@ const DetailPanel = (function() {
                 const intv = parseInt(intervalInput.value) || 30;
                 if (intv !== config.resetInterval) {
                     ConfigManager.save({ resetInterval: Math.max(5, Math.min(120, intv)) });
+                    hasChanges = true;
+                }
+            }
+
+            // v1.3.0: 保存自动导航开关
+            const autoNavToggle = document.getElementById('bilibili-study-auto-navigate-toggle');
+            if (autoNavToggle) {
+                const newAutoNavigate = autoNavToggle.checked;
+                if (newAutoNavigate !== config.autoNavigate) {
+                    ConfigManager.save({ autoNavigate: newAutoNavigate });
                     hasChanges = true;
                 }
             }
@@ -6511,7 +6536,8 @@ const InterventionController = (function() {
     const MODAL_STATES = {
         NONE: 'none',
         CONFIRM: 'confirm',
-        WORD_VERIFY: 'wordVerify'
+        WORD_VERIFY: 'wordVerify',
+        AGGRESSIVE: 'aggressive'  // v1.3.0 P2: 强拦截全屏遮罩
     };
 
     let modalState = MODAL_STATES.NONE;
@@ -6754,6 +6780,118 @@ const InterventionController = (function() {
         });
     }
 
+    /**
+     * v1.3.0 P0: 自动跳转到白名单学习视频
+     * 跳转前通过 HistoryVideoTracker 记录离开
+     */
+    function navigateToStudyVideo(options) {
+        const opts = options || {};
+        const whitelist = ConfigManager.getWhitelistArray();
+        if (!whitelist || whitelist.length === 0) return;
+
+        const currentBV = PageMonitor.getCurrentBV();
+        if (currentBV) {
+            const reason = opts.reason || 'distraction';
+            HistoryVideoTracker.record(currentBV, document.title, 'distraction', reason);
+        }
+
+        const targetBV = ConfigManager.getDefaultReturnBV();
+        if (targetBV) {
+            window.location.href = `https://www.bilibili.com/video/${targetBV}`;
+        }
+    }
+
+    /**
+     * v1.3.0 P0: 显示自动导航倒计时 Toast
+     * 弹窗关闭后显示3秒倒计时，结束后自动跳转到白名单视频
+     * Toast 上可点击"取消"取消跳转
+     */
+    function showAutoNavigateToast() {
+        const config = ConfigManager.get();
+        if (!config.autoNavigate) return;
+        const whitelist = ConfigManager.getWhitelistArray();
+        if (!whitelist || whitelist.length === 0) return;
+
+        // 移除已有 toast
+        const existing = document.getElementById('bilibili-study-auto-navigate-toast');
+        if (existing) existing.remove();
+
+        let countdown = 3;
+        let cancelled = false;
+        let countdownTimer = null;
+        const isDark = (typeof DetailPanel !== 'undefined' && typeof DetailPanel.getCurrentTheme === 'function')
+            ? DetailPanel.getCurrentTheme() === 'dark'
+            : false;
+
+        const bg = isDark ? 'rgba(30, 35, 45, 0.97)' : 'rgba(255, 255, 255, 0.97)';
+        const textColor = isDark ? '#e0e0e0' : '#333';
+        const accentColor = isDark ? '#60a5fa' : '#3b82f6';
+        const cancelColor = isDark ? '#f87171' : '#dc2626';
+
+        const toast = document.createElement('div');
+        toast.id = 'bilibili-study-auto-navigate-toast';
+        toast.innerHTML = `
+            <div style="
+                display: flex; align-items: center; gap: 12px;
+                background: ${bg};
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 10px;
+                padding: 12px 18px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                backdrop-filter: blur(12px);
+                color: ${textColor};
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                min-width: 300px;
+                animation: vocabToastIn 0.25s ease-out;
+            ">
+                <span style="font-size:16px;">⏰</span>
+                <span style="flex:1; font-size: 14px;">
+                    即将跳转到学习视频 <strong id="bilibili-study-countdown-num" style="color:${accentColor};">${countdown}</strong>s
+                </span>
+                <button id="bilibili-study-auto-nav-cancel" style="
+                    background: none; border: 1px solid ${cancelColor}; color: ${cancelColor};
+                    border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 13px;
+                    font-weight: 500;
+                ">取消</button>
+            </div>
+        `;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000002;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        `;
+
+        document.body.appendChild(toast);
+
+        // 取消按钮
+        document.getElementById('bilibili-study-auto-nav-cancel').addEventListener('click', function() {
+            cancelled = true;
+            clearInterval(countdownTimer);
+            toast.style.animation = 'vocabToastOut 0.25s ease-in forwards';
+            setTimeout(() => toast.remove(), 300);
+        });
+
+        // 倒计时
+        countdownTimer = setInterval(function() {
+            countdown--;
+            const numEl = document.getElementById('bilibili-study-countdown-num');
+            if (numEl) numEl.textContent = countdown;
+            if (countdown <= 0) {
+                clearInterval(countdownTimer);
+                toast.remove();
+                if (!cancelled) {
+                    DebugTelemetry.logIntervention('auto_navigate', { reason: 'popup_close', countdown: 3 });
+                    navigateToStudyVideo({ reason: 'auto_navigate' });
+                }
+            }
+        }, 1000);
+
+        console.log('[B站学习助手] showAutoNavigateToast: 开始3秒倒计时');
+    }
+
     function closeCurrentModal() {
         // v1.2.5: 通过 ModalManager 关闭所有干预弹窗
         ModalManager.dismiss('confirm-modal');
@@ -6775,6 +6913,195 @@ const InterventionController = (function() {
         } else {
             window.history.back();
         }
+    }
+
+    /**
+     * v1.3.0 P2: 温和级别 Toast 提醒（替代 Stage 0 确认弹窗）
+     * 首次分心时在底部显示轻量 Toast，15秒后自动消失
+     */
+    function showToastReminder() {
+        if (document.getElementById('bilibili-study-toast-reminder')) return;
+
+        const whitelist = ConfigManager.getWhitelistArray();
+        const hasWhitelist = whitelist && whitelist.length > 0;
+        const isDark = (typeof DetailPanel !== 'undefined' && typeof DetailPanel.getCurrentTheme === 'function')
+            ? DetailPanel.getCurrentTheme() === 'dark'
+            : false;
+
+        const bg = isDark ? 'rgba(30, 35, 45, 0.97)' : 'rgba(255, 255, 255, 0.97)';
+        const textColor = isDark ? '#e0e0e0' : '#333';
+        const accentColor = isDark ? '#60a5fa' : '#3b82f6';
+        const mutedColor = isDark ? '#94a3b8' : '#64748b';
+
+        const toast = document.createElement('div');
+        toast.id = 'bilibili-study-toast-reminder';
+        toast.innerHTML = `
+            <div style="
+                display: flex; align-items: center; gap: 12px;
+                background: ${bg};
+                border: 1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'};
+                border-radius: 12px;
+                padding: 12px 18px;
+                box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+                backdrop-filter: blur(12px);
+                color: ${textColor};
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                min-width: 320px;
+                animation: vocabToastIn 0.25s ease-out;
+            ">
+                <span style="font-size:18px;">⏸️</span>
+                <div style="flex:1;">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 2px;">你正在学习时段中</div>
+                    <div style="font-size: 12px; color: ${mutedColor};">已离开学习状态，请尽快返回</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    ${hasWhitelist ? `<button id="bilibili-study-toast-return" style="
+                        background: ${accentColor}; color: white; border: none;
+                        border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+                        font-weight: 500;
+                    ">返回学习</button>` : ''}
+                    <button id="bilibili-study-toast-dismiss" style="
+                        background: none; border: 1px solid ${mutedColor}; color: ${mutedColor};
+                        border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+                    ">我知道了</button>
+                </div>
+            </div>
+        `;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000001;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        `;
+
+        document.body.appendChild(toast);
+
+        // 返回学习按钮
+        const returnBtn = document.getElementById('bilibili-study-toast-return');
+        if (returnBtn) {
+            returnBtn.addEventListener('click', function() {
+                toast.remove();
+                returnToLearning();
+            });
+        }
+
+        // 我知道了按钮
+        document.getElementById('bilibili-study-toast-dismiss').addEventListener('click', function() {
+            toast.remove();
+        });
+
+        // 15秒后自动消失
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.animation = 'vocabToastOut 0.25s ease-in forwards';
+                setTimeout(() => toast.remove(), 300);
+            }
+        }, 15000);
+
+        DebugTelemetry.logIntervention('toast_reminder', { level: 'gentle', action: 'show' });
+        console.log('[B站学习助手] showToastReminder: 显示温和提醒Toast');
+    }
+
+    /**
+     * v1.3.0 P2: 强拦截全屏遮罩（Stage 3+）
+     * 全屏遮罩 + 10秒倒计时 + 自动跳转
+     */
+    function showAggressiveIntervention() {
+        if (document.getElementById('bilibili-study-aggressive-overlay')) return;
+
+        const state = window.__bilibiliStudyAppState;
+        const distractionElapsed = state && state.distractionStartTime
+            ? Math.floor((Date.now() - state.distractionStartTime) / 1000)
+            : 0;
+        const distractionMinutes = Math.floor(distractionElapsed / 60);
+        const isDark = (typeof DetailPanel !== 'undefined' && typeof DetailPanel.getCurrentTheme === 'function')
+            ? DetailPanel.getCurrentTheme() === 'dark'
+            : false;
+
+        let countdown = 10;
+        let countdownTimer = null;
+        let navigated = false;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'bilibili-study-aggressive-overlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1000006;
+            display: flex; align-items: center; justify-content: center;
+            background: ${isDark ? 'rgba(0,0,0,0.92)' : 'rgba(0,0,0,0.85)'};
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            animation: bilibili-study-fade-in 0.3s ease-out;
+        `;
+        if (isDark) overlay.classList.add('bilibili-study-dark-mode');
+
+        overlay.innerHTML = `
+            <div style="
+                text-align: center; color: white; max-width: 450px; padding: 40px;
+            ">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                <h2 style="font-size: 24px; margin: 0 0 12px 0; color: ${isDark ? '#f87171' : '#ff6b6b'};">
+                    你已分心超过 ${distractionMinutes} 分钟
+                </h2>
+                <p style="font-size: 16px; color: ${isDark ? '#cbd5e1' : '#e0e0e0'}; margin: 0 0 24px 0;">
+                    即将在 <strong id="bilibili-study-aggressive-countdown" style="font-size: 28px; color: #60a5fa;">${countdown}</strong> 秒后跳转回学习视频
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button id="bilibili-study-aggressive-jump" style="
+                        background: #3b82f6; color: white; border: none;
+                        border-radius: 8px; padding: 12px 24px; cursor: pointer; font-size: 16px;
+                        font-weight: 600;
+                    ">立即跳转</button>
+                    <button id="bilibili-study-aggressive-delay" style="
+                        background: transparent; color: ${isDark ? '#94a3b8' : '#ccc'}; 
+                        border: 1px solid ${isDark ? '#475569' : '#666'};
+                        border-radius: 8px; padding: 12px 24px; cursor: pointer; font-size: 14px;
+                    ">再答一题争取时间</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        ModalManager.register('aggressive-overlay', ModalManager.LEVELS.AGGRESSIVE, overlay);
+
+        function doNavigate() {
+            if (navigated) return;
+            navigated = true;
+            clearInterval(countdownTimer);
+            overlay.remove();
+            DebugTelemetry.logIntervention('aggressive_jump', { countdown, elapsed: distractionElapsed });
+            navigateToStudyVideo({ reason: 'aggressive_auto' });
+        }
+
+        // 立即跳转
+        document.getElementById('bilibili-study-aggressive-jump').addEventListener('click', doNavigate);
+
+        // 再答一题争取时间
+        document.getElementById('bilibili-study-aggressive-delay').addEventListener('click', function() {
+            if (navigated) return;
+            clearInterval(countdownTimer);
+            overlay.remove();
+            ModalManager.dismiss('aggressive-overlay');
+            // 弹出单词弹窗，答对可延迟5分钟
+            lastPopupTime = Date.now();
+            const savedLastPopup = lastPopupTime;
+            showWordVerifierModal();
+            // 记录延迟尝试
+            DebugTelemetry.logIntervention('aggressive_delay_attempt', {});
+        });
+
+        // 倒计时
+        countdownTimer = setInterval(function() {
+            countdown--;
+            const numEl = document.getElementById('bilibili-study-aggressive-countdown');
+            if (numEl) numEl.textContent = countdown;
+            if (countdown <= 0) {
+                doNavigate();
+            }
+        }, 1000);
+
+        console.log('[B站学习助手] showAggressiveIntervention: 显示强拦截遮罩');
     }
 
     function showConfirmModal() {
@@ -6899,6 +7226,8 @@ const InterventionController = (function() {
             }
             // Start the popup timer from this point
             lastPopupTime = Date.now();
+            // v1.3.0 P0: 触发自动导航倒计时
+            showAutoNavigateToast();
         });
 
         document.getElementById('bilibili-study-confirm-no').addEventListener('click', function() {
@@ -6991,6 +7320,8 @@ const InterventionController = (function() {
             skipBtn.addEventListener('click', function() {
                 console.log('[B站学习助手] word-skip: 跳过按钮被点击');
                 closeCurrentModal();
+                // v1.3.0 P0: 触发自动导航倒计时
+                showAutoNavigateToast();
             });
         }
 
@@ -7154,7 +7485,11 @@ const InterventionController = (function() {
             StatisticsTracker.recordWordAttempt(true);
             feedback.innerHTML = `<span style="color: ${isDark ? '#4ade80' : '#16a34a'}; font-weight: bold;">✅ 回答正确！</span>`;
             // 正确答案直接关闭
-            setTimeout(() => closeCurrentModal(), 300);
+            setTimeout(() => {
+                closeCurrentModal();
+                // v1.3.0 P0: 触发自动导航倒计时
+                showAutoNavigateToast();
+            }, 300);
         } else {
             console.log('[B站学习助手]   → 回答错误, 开始揭示字母, wordLength=', currentWord.english.length, 'revealed=', revealedIndices.size);
             feedback.innerHTML = `<span style="color: ${isDark ? '#f87171' : '#dc2626'}; font-weight: bold;">❌ 回答错误，再试一次</span>`;
@@ -7203,6 +7538,8 @@ const InterventionController = (function() {
                         closeCurrentModal();
                         // 重置lastPopupTime以开始下一轮计时
                         lastPopupTime = Date.now();
+                        // v1.3.0 P0: 触发自动导航倒计时
+                        showAutoNavigateToast();
                     }
                 }, 6000);
             } else {
@@ -7255,8 +7592,17 @@ const InterventionController = (function() {
         console.log('[B站学习助手] showPopupIfNeeded: stage=', stage, 'elapsed=', elapsed, 'interval=', intervalMs, 'ready=', elapsed >= intervalMs);
 
         if (elapsed >= intervalMs) {
-            // 所有分心阶段统一使用单词验证弹窗
-            showWordVerifierModal();
+            // v1.3.0: 根据干预级别分流
+            const interventionLevel = ConfigManager.getInterventionLevel(stage);
+            if (interventionLevel === 'strict' || interventionLevel === 'aggressive') {
+                // 强拦截级别：全屏遮罩 + 自动跳转
+                if (!document.getElementById('bilibili-study-aggressive-overlay')) {
+                    showAggressiveIntervention();
+                }
+            } else {
+                // 标准/温和级别：单词验证弹窗
+                showWordVerifierModal();
+            }
             // Update lastPopupTime AFTER showing popup
             lastPopupTime = now;
         }
@@ -7269,6 +7615,211 @@ const InterventionController = (function() {
         currentWord = null;
         revealedIndices = new Set();
         wordRevealTime = 0;
+    }
+
+    // ── v1.3.0 P0: 自动导航到学习视频 ──
+    function navigateToStudyVideo(options) {
+        const opts = options || {};
+        const whitelist = ConfigManager.getWhitelistArray();
+        if (!whitelist || whitelist.length === 0) return;
+
+        const targetBV = ConfigManager.getDefaultReturnBV();
+        if (!targetBV) return;
+
+        // 跳转前记录离开
+        const currentBV = PageMonitor.getCurrentBV();
+        if (currentBV) {
+            HistoryVideoTracker.record(currentBV, document.title, 'distraction', 'intervention');
+        }
+
+        console.log('[B站学习助手] navigateToStudyVideo: 自动跳转到', targetBV, 'reason:', opts.reason || 'distraction');
+        DebugTelemetry.logIntervention('auto_navigate', { targetBV, reason: opts.reason || 'distraction' });
+        window.location.href = `https://www.bilibili.com/video/${targetBV}`;
+    }
+
+    // ── v1.3.0 P0: 自动导航倒计时 Toast ──
+    function showAutoNavigateToast() {
+        const config = ConfigManager.get();
+        if (!config.autoNavigate) return;
+
+        const whitelist = ConfigManager.getWhitelistArray();
+        if (!whitelist || whitelist.length === 0) return;
+
+        // 移除已有的导航 Toast
+        const existing = document.getElementById('bilibili-study-auto-nav-toast');
+        if (existing) existing.remove();
+
+        const isDark = DetailPanel.getCurrentTheme() === 'dark';
+        const bg = isDark ? 'rgba(30,35,45,0.97)' : 'rgba(255,255,255,0.97)';
+        const textColor = isDark ? '#f1f5f9' : '#1e293b';
+        const btnBg = isDark ? 'rgba(96,165,250,0.2)' : 'rgba(59,130,246,0.1)';
+        const btnColor = isDark ? '#60a5fa' : '#3b82f6';
+        const borderColor = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(59,130,246,0.2)';
+
+        let countdown = 3;
+        let cancelled = false;
+        let timer = null;
+
+        const targetBV = ConfigManager.getDefaultReturnBV();
+        const toast = document.createElement('div');
+        toast.id = 'bilibili-study-auto-nav-toast';
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000001;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            animation: bilibili-study-slide-up 0.25s ease-out;
+        `;
+        toast.innerHTML = `
+            <div style="
+                display: flex; align-items: center; gap: 12px;
+                background: ${bg};
+                border: 1px solid ${borderColor};
+                border-radius: 12px;
+                padding: 12px 18px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+                backdrop-filter: blur(12px);
+                color: ${textColor};
+                font-size: 14px;
+            ">
+                <span style="font-weight: 600;">⏰ ${countdown}s 后自动返回学习视频</span>
+                <button id="bilibili-study-nav-cancel" style="
+                    background: ${btnBg};
+                    color: ${btnColor};
+                    border: 1px solid ${borderColor};
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.15s;
+                ">取消</button>
+            </div>
+        `;
+
+        document.body.appendChild(toast);
+
+        // 取消按钮事件
+        document.getElementById('bilibili-study-nav-cancel').addEventListener('click', function() {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            if (toast.parentNode) toast.remove();
+            console.log('[B站学习助手] auto-navigate: 用户取消导航');
+        });
+
+        // 倒计时
+        function tick() {
+            if (cancelled) return;
+            countdown--;
+            const countSpan = toast.querySelector('span');
+            if (countSpan) countSpan.textContent = `⏰ ${countdown}s 后自动返回学习视频`;
+            if (countdown <= 0) {
+                toast.remove();
+                navigateToStudyVideo({ reason: 'auto_navigate' });
+            } else {
+                timer = setTimeout(tick, 1000);
+            }
+        }
+        timer = setTimeout(tick, 1000);
+    }
+
+    // ── v1.3.0 P2: 强拦截全屏遮罩 ──
+    function showAggressiveIntervention() {
+        if (modalState !== MODAL_STATES.NONE) {
+            console.log('[B站学习助手] showAggressiveIntervention: 跳过，当前弹窗状态=', modalState);
+            return;
+        }
+        console.log('[B站学习助手] showAggressiveIntervention: 显示强拦截全屏遮罩');
+        modalState = MODAL_STATES.AGGRESSIVE;
+
+        const isDark = DetailPanel.getCurrentTheme() === 'dark';
+        const bg = isDark ? 'rgba(0,0,0,0.92)' : 'rgba(0,0,0,0.88)';
+        const textColor = isDark ? '#f1f5f9' : '#ffffff';
+        const btnColor = isDark ? '#60a5fa' : '#3b82f6';
+
+        const state = window.__bilibiliStudyAppState;
+        const distractionDuration = state && state.distractionStartTime
+            ? Math.floor((Date.now() - state.distractionStartTime) / 1000)
+            : 0;
+        const minutes = Math.floor(distractionDuration / 60);
+        const seconds = distractionDuration % 60;
+
+        let countdown = 10;
+        let cancelled = false;
+        let timer = null;
+
+        const modal = document.createElement('div');
+        modal.className = 'bilibili-study-modal-overlay';
+        modal.id = 'bilibili-study-aggressive-modal';
+        modal.style.background = bg;
+        modal.style.zIndex = '1000006';
+        modal.innerHTML = `
+            <div class="bilibili-study-modal" style="
+                max-width: 480px;
+                background: ${isDark ? 'rgba(30,35,45,0.97)' : 'rgba(255,255,255,0.12)'};
+                border: 1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.2)'};
+                text-align: center;
+                padding: 30px;
+            ">
+                <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
+                <h2 style="color: ${textColor}; margin: 0 0 10px 0; font-size: 22px;">你已分心超过 ${minutes} 分钟</h2>
+                <p style="color: ${textColor}; opacity: 0.7; font-size: 16px; margin: 0 0 20px 0;">
+                    即将在 <strong id="bilibili-study-aggressive-countdown" style="color: ${btnColor}; font-size: 20px;">${countdown}</strong> 秒后跳转回学习视频
+                </p>
+                <div class="bilibili-study-action-buttons" style="justify-content: center; gap: 12px;">
+                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-aggressive-jump"
+                            style="background: ${btnColor}; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer;">
+                        立即跳转
+                    </button>
+                    <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-aggressive-delay"
+                            style="background: transparent; color: ${textColor}; border: 1px solid rgba(255,255,255,0.3); padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer;">
+                        再答一题争取时间
+                    </button>
+                </div>
+            </div>
+        `;
+
+        getModalContainer().appendChild(modal);
+        if (isDark) modal.classList.add('bilibili-study-dark-mode');
+
+        ModalManager.register('aggressive-modal', ModalManager.LEVELS.AGGRESSIVE, modal);
+
+        // 立即跳转
+        document.getElementById('bilibili-study-aggressive-jump').addEventListener('click', function() {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            closeCurrentModal();
+            navigateToStudyVideo({ reason: 'aggressive_immediate' });
+        });
+
+        // 再答一题（延迟）
+        document.getElementById('bilibili-study-aggressive-delay').addEventListener('click', function() {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            ModalManager.dismiss('aggressive-modal');
+            modalState = MODAL_STATES.NONE;
+            // 弹出单词验证弹窗
+            showWordVerifierModal();
+        });
+
+        // 倒计时
+        function tick() {
+            if (cancelled) return;
+            countdown--;
+            const countEl = document.getElementById('bilibili-study-aggressive-countdown');
+            if (countEl) countEl.textContent = countdown;
+            if (countdown <= 0) {
+                closeCurrentModal();
+                navigateToStudyVideo({ reason: 'aggressive_timeout' });
+            } else {
+                timer = setTimeout(tick, 1000);
+            }
+        }
+        timer = setTimeout(tick, 1000);
+
+        DebugTelemetry.logIntervention('aggressive', { distractionDuration, countdown: 10 });
     }
 
     // Track page visibility for accurate timing
@@ -7364,8 +7915,9 @@ const InterventionController = (function() {
                 state.isStudying = false;
                 // v1.2.3: 同步到全局状态
                 GlobalStateManager.syncFromAppState();
-                console.log('[B站学习助手] check: 首次分心，弹出确认弹窗');
-                showConfirmModal();
+                console.log('[B站学习助手] check: 首次分心，弹出温和提醒Toast');
+                // v1.3.0 P2: 使用 Toast 提醒替代确认弹窗
+                showToastReminder();
                 return;
             }
 
@@ -7400,7 +7952,12 @@ const InterventionController = (function() {
         showConfirmModal,
         reset,
         closeCurrentModal,
-        returnToLearning
+        returnToLearning,
+        // v1.3.0 新增
+        navigateToStudyVideo,
+        showAutoNavigateToast,
+        showToastReminder,
+        showAggressiveIntervention
     };
 })();
 
