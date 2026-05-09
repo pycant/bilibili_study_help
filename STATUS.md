@@ -23,9 +23,8 @@
 
 | 缺口 | 优先级 | 说明 |
 |------|--------|------|
-| Telemetry Dashboard 动态接入 | P1 | 已预备从 localStorage 读取，但 check.sh→browser 管线还未完全接通 |
-| 自动化 Skill 更新 | P2 | Meta Agent 读取失败模式 → 自动更新 SKILL.md |
-| npm test 回归 | P3 | `package.json` 配了 Jest 但从未跑过 |
+| 自动化 Skill 更新 | P2 | Meta Agent 读取失败模式 → 自动更新 SKILL.md (已有meta-update.sh分析脚本) |
+| npm test 回归 | P3 | ✅ 已回归 — 24/24 PASS，自包含测试框架 |
 
 ---
 
