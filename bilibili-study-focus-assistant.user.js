@@ -6110,16 +6110,25 @@ const SettingsPanel = (function() {
 })();
 
 // ==========================================
-// DetailPanel Module
+// PanelRenderer Module (面板渲染 + 主题管理，从 DetailPanel 拆分)
 // ==========================================
-const DetailPanel = (function() {
-    const MODAL_ID = 'bilibili-study-detail-modal';
-    const THEME_KEY = 'bilibiliStudyAssistant_theme';
-    let modalElement = null;
-    let isOpen = false;
-    let currentTheme = 'light'; // 'light' or 'dark'
+const PanelRenderer = (function() {
+    var MODAL_ID = 'bilibili-study-detail-modal';
+    var THEME_KEY = 'bilibiliStudyAssistant_theme';
+    var modalElement = null;
+    var isOpen = false;
+    var currentTheme = 'light';
 
-    // Load theme preference
+    // VocabPanel 回调（由 DetailPanel 在初始化时注入）
+    var _vocab = {
+        handleRefreshVocabBtn: null,
+        handleResetVocabBtn: null,
+        renderModule3: null,
+        renderModule4: null
+    };
+    function _injectVocabCallbacks(cbs) { _vocab = cbs; }
+
+// Load theme preference
     function loadTheme() {
         try {
             const saved = localStorage.getItem(THEME_KEY);
@@ -6199,11 +6208,6 @@ const DetailPanel = (function() {
     }
 
     // Get word records
-    function getWordRecords() {
-        return getOrInitModule('wordRecords');
-    }
-
-    // Get 7-day trend data
     function getTrendData() {
         const stats = getOrInitModule('timeStats');
         const history = stats.history || [];
@@ -6229,87 +6233,6 @@ const DetailPanel = (function() {
     }
 
     // ===== 刷新/重置词库按钮处理器（声明在作用域顶层，showDetailedStatsModal和refreshVocabDisplay均可访问） =====
-    function handleRefreshVocabBtn(e) {
-        e.stopPropagation();
-        console.log('[B站学习助手] handleRefreshVocabBtn: 刷新词库显示');
-        refreshVocabDisplay();
-    }
-
-    function handleResetVocabBtn(e) {
-        e.stopPropagation();
-        if (!confirm('确认重置所有单词的掌握状态和答题记录吗？\n\n所有已掌握单词、连续正确次数将清零，重新从零开始学习。')) {
-            return;
-        }
-        console.log('[B站学习助手] handleResetVocabBtn: 重置所有学习记录');
-        WordVerifier.resetWordRecords();
-        // 弹出主题感知的重置成功提示
-        const total = WordVerifier.parseVocabulary().length;
-        showVocabToast({ total, mastered: 0, learnable: total, changed: 0 }, 'reset');
-        // 重渲染 Module3 + Module4
-        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
-        if (wrapper) {
-            const temp = document.createElement('div');
-            temp.innerHTML = renderModule3();
-            wrapper.replaceWith(temp.firstElementChild);
-            // 重新绑定按钮事件
-            const newResetBtn = document.getElementById('bilibili-study-reset-vocab');
-            if (newResetBtn) newResetBtn.addEventListener('click', handleResetVocabBtn);
-            const newRefreshBtn = document.getElementById('bilibili-study-refresh-vocab');
-            if (newRefreshBtn) newRefreshBtn.addEventListener('click', handleRefreshVocabBtn);
-        }
-        const modal = document.getElementById('bilibili-study-detail-modal');
-        if (modal) {
-            const m4 = modal.querySelector('.bilibili-study-modal-module:nth-child(4)');
-            if (m4) {
-                const t = document.createElement('div');
-                t.innerHTML = renderModule4();
-                m4.replaceWith(t.firstElementChild);
-            }
-        }
-    }
-
-    // 刷新词库显示（置于 DetailPanel 作用域内，可直接调用 renderModule3/renderModule4）
-    function refreshVocabDisplay() {
-        console.log('[B站学习助手] refreshVocabDisplay: 开始刷新词库显示');
-        console.log('[B站学习助手]   当前词库总词数:', WordVerifier.parseVocabulary().length);
-        console.log('[B站学习助手]   当前已掌握词数:', Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length);
-        console.log('[B站学习助手]   当前可学习词数:', WordVerifier.getUnmasteredCount());
-
-        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
-        if (wrapper) {
-            const temp = document.createElement('div');
-            temp.innerHTML = renderModule3();
-            wrapper.replaceWith(temp.firstElementChild);
-            // 为新按钮重新绑定事件（handleRefreshVocabBtn/handleResetVocabBtn同在DetailPanel作用域）
-            const resetBtn = document.getElementById('bilibili-study-reset-vocab');
-            if (resetBtn) resetBtn.addEventListener('click', handleResetVocabBtn);
-            const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
-            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocabBtn);
-            console.log('[B站学习助手] refreshVocabDisplay: Module3 刷新成功');
-        } else {
-            console.warn('[B站学习助手] refreshVocabDisplay: 未找到 Module3 容器元素');
-        }
-        // 同步刷新 Module4 建议区
-        const modalElement = document.getElementById('bilibili-study-detail-modal');
-        if (modalElement) {
-            const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
-            if (module4) {
-                const temp4 = document.createElement('div');
-                temp4.innerHTML = renderModule4();
-                module4.replaceWith(temp4.firstElementChild);
-                console.log('[B站学习助手] refreshVocabDisplay: Module4 刷新成功');
-            }
-        }
-        console.log('[B站学习助手] refreshVocabDisplay: 词库信息刷新完成');
-
-        // 弹出主题感知的词库信息提示
-        const total = WordVerifier.parseVocabulary().length;
-        const mastered = Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length;
-        const learnable = total - mastered;
-        showVocabToast({ total, mastered, learnable, changed: learnable }, 'refresh');
-    }
-
-    // Render Module 1: Today's overview
     function renderModule1() {
         const stats = getTodayStats();
         const accuracy = stats.wordAccuracy;
@@ -6389,160 +6312,6 @@ const DetailPanel = (function() {
     }
 
     // Render Module 3: Word learning records
-    function renderModule3() {
-        const wordData = getWordRecords();
-        const words = wordData.words || {};
-        const recentAnswers = wordData.recentAnswers || [];
-
-        // 统计来源：词库配置总词数，而非 localStorage 答题记录数
-        const vocabList = WordVerifier.parseVocabulary();
-        const totalWords = vocabList.length;  // 词库配置中的总词数（362）
-        const masteredWords = Object.values(words).filter(w => w.mastered).length;  // 答过且已掌握
-        const progressPercent = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
-
-        // 词库更新提醒：非掌握单词不足50时显示
-        const unmasteredCount = WordVerifier.getUnmasteredCount();
-        const reducedCount = WordVerifier.getReducedProbabilityCount();
-        let vocabWarning = '';
-        if (unmasteredCount < 50 && unmasteredCount > 0) {
-            vocabWarning = `
-                <div class="bilibili-study-vocab-warning">
-                    <div class="bilibili-study-vocab-warning-header">
-                        <span class="bilibili-study-vocab-warning-icon">⚠️</span>
-                        <span class="bilibili-study-vocab-warning-title">词库不足提醒</span>
-                    </div>
-                    <p class="bilibili-study-vocab-warning-text">
-                        可学习单词仅剩 <strong>${unmasteredCount}</strong> 个，建议添加更多词汇以保持学习效果。
-                    </p>
-                </div>`;
-        } else if (unmasteredCount === 0) {
-            vocabWarning = `
-                <div class="bilibili-study-vocab-critical">
-                    <div class="bilibili-study-vocab-critical-header">
-                        <span class="bilibili-study-vocab-critical-icon">🔴</span>
-                        <span class="bilibili-study-vocab-critical-title">词库已全部掌握</span>
-                    </div>
-                    <p class="bilibili-study-vocab-critical-text">
-                        所有单词已掌握，请添加新词汇继续学习！
-                    </p>
-                </div>`;
-        }
-
-        // Get mastered words list
-        const masteredList = Object.values(words)
-            .filter(w => w.mastered)
-            .map(w => w.chinese)
-            .join('、') || '暂无';
-
-        // Get recent 10 answers
-        const recent10 = recentAnswers.slice(-10).reverse();
-        const recentAnswersHtml = recent10.length > 0
-            ? recent10.map(a => `<span class="bilibili-study-answer ${a.correct ? 'bilibili-study-answer-correct' : 'bilibili-study-answer-incorrect'}">${a.correct ? '✓' : '✗'}${a.word}</span>`).join(' ')
-            : '暂无答题记录';
-
-        return `
-            <div class="bilibili-study-modal-module" id="bilibili-study-module3-wrapper">
-                <div class="bilibili-study-module-header">
-                    <h3 class="bilibili-study-module-title">📚 单词学习</h3>
-                    <div class="bilibili-study-module-actions">
-                        <button id="bilibili-study-refresh-vocab"
-                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-primary"
-                                title="刷新词库信息，查看最新学习状态（不清除记录）">
-                            🔄 刷新词库
-                        </button>
-                        <button id="bilibili-study-reset-vocab"
-                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-secondary"
-                                title="重置所有单词的掌握状态和答题记录，从零开始学习">
-                            🗑️ 重置记录
-                        </button>
-                    </div>
-                </div>
-                <div class="bilibili-study-module-content">
-                    ${vocabWarning}
-                    <div class="bilibili-study-stat-row">
-                        <span class="bilibili-study-stat-label">总单词数：</span>
-                        <span class="bilibili-study-stat-value">${totalWords}</span>
-                    </div>
-                    <div class="bilibili-study-stat-row">
-                        <span class="bilibili-study-stat-label">已掌握：</span>
-                        <span class="bilibili-study-stat-value">${masteredWords}</span>
-                    </div>
-                    <div class="bilibili-study-stat-row">
-                        <span class="bilibili-study-stat-label">可学习：</span>
-                        <span class="bilibili-study-stat-value">${unmasteredCount}${reducedCount > 0 ? `（含${reducedCount}个即将掌握）` : ''}</span>
-                    </div>
-                    <div class="bilibili-study-progress-container">
-                        <div class="bilibili-study-progress-bar">
-                            <div class="bilibili-study-progress-fill" style="width: ${progressPercent}%"></div>
-                        </div>
-                        <span class="bilibili-study-progress-text">${progressPercent}%</span>
-                    </div>
-                    <div class="bilibili-study-mastered-list">
-                        <span class="bilibili-study-stat-label">已掌握：</span>
-                        <span class="bilibili-study-stat-value">${masteredList}</span>
-                    </div>
-                    <div class="bilibili-study-recent-answers">
-                        <span class="bilibili-study-stat-label">最近答题：</span>
-                        <div class="bilibili-study-answers-list">${recentAnswersHtml}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    // Render Module 4: Focus suggestions
-    function renderModule4() {
-        const stats = getTodayStats();
-        const wordData = getWordRecords();
-        const words = wordData.words || {};
-        const masteredCount = Object.values(words).filter(w => w.mastered).length;
-
-        const suggestions = [];
-
-        // Suggestion based on distraction time
-        if (stats.distractionTime > 1800) { // > 30 min
-            suggestions.push('今天分心时间较长，建议设置更明确的学习目标。');
-        }
-
-        // Suggestion based on distraction count
-        if (stats.distractionCount > 5) {
-            suggestions.push(`您今天已经分心${stats.distractionCount}次了，建议短暂休息一下。`);
-        }
-
-        // Suggestion based on study time
-        if (stats.studyTime > 7200 && stats.distractionTime < 600) { // > 2h study, < 10min distraction
-            suggestions.push('学习状态非常好！继续保持专注！');
-        }
-
-        // Suggestion based on word learning
-        if (masteredCount > 0) {
-            suggestions.push(`您已经掌握了${masteredCount}个单词，继续加油！`);
-        } else if (Object.keys(words).length > 0) {
-            suggestions.push('尝试开始单词学习，通过测验来巩固记忆。');
-        }
-
-        // Default suggestion
-        if (suggestions.length === 0) {
-            suggestions.push('保持良好的学习习惯，祝您学习愉快！');
-        }
-
-        const suggestionsHtml = suggestions.map(s => `<li>${s}</li>`).join('');
-
-        return `
-            <div class="bilibili-study-modal-module">
-                <h3 class="bilibili-study-module-title bilibili-study-collapsible" id="bilibili-study-suggestions-toggle">
-                    💡 专注建议 <span class="bilibili-study-toggle-icon">▶</span>
-                </h3>
-                <div class="bilibili-study-module-content bilibili-study-collapsible-content" id="bilibili-study-suggestions-content">
-                    <ul class="bilibili-study-suggestions-list">
-                        ${suggestionsHtml}
-                    </ul>
-                </div>
-            </div>
-        `;
-    }
-
-    // Render Module 5: Historical trends
     function renderModule5() {
         const trendData = getTrendData();
 
@@ -6971,15 +6740,294 @@ const DetailPanel = (function() {
     });
 
     return {
-        open,
-        close,
+        open: open,
+        close: close,
         isOpen: function() { return isOpen; },
         getCurrentTheme: function() { return currentTheme; },
         detectTheme: detectBilibiliTheme,
         loadTheme: loadTheme,
-        openSettings: SettingsPanel.openSettings
+        renderModule1: renderModule1,
+        renderModule2: renderModule2,
+        renderModule5: renderModule5,
+        renderModule6: renderModule6,
+        renderStatusSections: renderStatusSections,
+        _injectVocabCallbacks: _injectVocabCallbacks
     };
 })();
+
+
+// ==========================================
+// DetailPanel Module (VocabPanel)
+// ==========================================
+const DetailPanel = (function() {
+function getWordRecords() {
+        return getOrInitModule('wordRecords');
+    }
+
+    // Get 7-day trend data
+    function handleRefreshVocabBtn(e) {
+        e.stopPropagation();
+        console.log('[B站学习助手] handleRefreshVocabBtn: 刷新词库显示');
+        refreshVocabDisplay();
+    }
+
+    function handleResetVocabBtn(e) {
+        e.stopPropagation();
+        if (!confirm('确认重置所有单词的掌握状态和答题记录吗？\n\n所有已掌握单词、连续正确次数将清零，重新从零开始学习。')) {
+            return;
+        }
+        console.log('[B站学习助手] handleResetVocabBtn: 重置所有学习记录');
+        WordVerifier.resetWordRecords();
+        // 弹出主题感知的重置成功提示
+        const total = WordVerifier.parseVocabulary().length;
+        showVocabToast({ total, mastered: 0, learnable: total, changed: 0 }, 'reset');
+        // 重渲染 Module3 + Module4
+        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
+        if (wrapper) {
+            const temp = document.createElement('div');
+            temp.innerHTML = renderModule3();
+            wrapper.replaceWith(temp.firstElementChild);
+            // 重新绑定按钮事件
+            const newResetBtn = document.getElementById('bilibili-study-reset-vocab');
+            if (newResetBtn) newResetBtn.addEventListener('click', handleResetVocabBtn);
+            const newRefreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (newRefreshBtn) newRefreshBtn.addEventListener('click', handleRefreshVocabBtn);
+        }
+        const modal = document.getElementById('bilibili-study-detail-modal');
+        if (modal) {
+            const m4 = modal.querySelector('.bilibili-study-modal-module:nth-child(4)');
+            if (m4) {
+                const t = document.createElement('div');
+                t.innerHTML = renderModule4();
+                m4.replaceWith(t.firstElementChild);
+            }
+        }
+    }
+
+    // 刷新词库显示（置于 DetailPanel 作用域内，可直接调用 renderModule3/renderModule4）
+    function refreshVocabDisplay() {
+        console.log('[B站学习助手] refreshVocabDisplay: 开始刷新词库显示');
+        console.log('[B站学习助手]   当前词库总词数:', WordVerifier.parseVocabulary().length);
+        console.log('[B站学习助手]   当前已掌握词数:', Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length);
+        console.log('[B站学习助手]   当前可学习词数:', WordVerifier.getUnmasteredCount());
+
+        const wrapper = document.getElementById('bilibili-study-module3-wrapper');
+        if (wrapper) {
+            const temp = document.createElement('div');
+            temp.innerHTML = renderModule3();
+            wrapper.replaceWith(temp.firstElementChild);
+            // 为新按钮重新绑定事件（handleRefreshVocabBtn/handleResetVocabBtn同在DetailPanel作用域）
+            const resetBtn = document.getElementById('bilibili-study-reset-vocab');
+            if (resetBtn) resetBtn.addEventListener('click', handleResetVocabBtn);
+            const refreshBtn = document.getElementById('bilibili-study-refresh-vocab');
+            if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshVocabBtn);
+            console.log('[B站学习助手] refreshVocabDisplay: Module3 刷新成功');
+        } else {
+            console.warn('[B站学习助手] refreshVocabDisplay: 未找到 Module3 容器元素');
+        }
+        // 同步刷新 Module4 建议区
+        if (modalElement) {
+            const module4 = modalElement.querySelector('.bilibili-study-modal-module:nth-child(4)');
+            if (module4) {
+                const temp4 = document.createElement('div');
+                temp4.innerHTML = renderModule4();
+                module4.replaceWith(temp4.firstElementChild);
+                console.log('[B站学习助手] refreshVocabDisplay: Module4 刷新成功');
+            }
+        }
+        console.log('[B站学习助手] refreshVocabDisplay: 词库信息刷新完成');
+
+        // 弹出主题感知的词库信息提示
+        const total = WordVerifier.parseVocabulary().length;
+        const mastered = Object.values(WordVerifier.getWordRecords().words || {}).filter(w => w.mastered).length;
+        const learnable = total - mastered;
+        showVocabToast({ total, mastered, learnable, changed: learnable }, 'refresh');
+    }
+
+    // Render Module 1: Today's overview
+    function renderModule3() {
+        const wordData = getWordRecords();
+        const words = wordData.words || {};
+        const recentAnswers = wordData.recentAnswers || [];
+
+        // 统计来源：词库配置总词数，而非 localStorage 答题记录数
+        const vocabList = WordVerifier.parseVocabulary();
+        const totalWords = vocabList.length;  // 词库配置中的总词数（362）
+        const masteredWords = Object.values(words).filter(w => w.mastered).length;  // 答过且已掌握
+        const progressPercent = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
+
+        // 词库更新提醒：非掌握单词不足50时显示
+        const unmasteredCount = WordVerifier.getUnmasteredCount();
+        const reducedCount = WordVerifier.getReducedProbabilityCount();
+        let vocabWarning = '';
+        if (unmasteredCount < 50 && unmasteredCount > 0) {
+            vocabWarning = `
+                <div class="bilibili-study-vocab-warning">
+                    <div class="bilibili-study-vocab-warning-header">
+                        <span class="bilibili-study-vocab-warning-icon">⚠️</span>
+                        <span class="bilibili-study-vocab-warning-title">词库不足提醒</span>
+                    </div>
+                    <p class="bilibili-study-vocab-warning-text">
+                        可学习单词仅剩 <strong>${unmasteredCount}</strong> 个，建议添加更多词汇以保持学习效果。
+                    </p>
+                </div>`;
+        } else if (unmasteredCount === 0) {
+            vocabWarning = `
+                <div class="bilibili-study-vocab-critical">
+                    <div class="bilibili-study-vocab-critical-header">
+                        <span class="bilibili-study-vocab-critical-icon">🔴</span>
+                        <span class="bilibili-study-vocab-critical-title">词库已全部掌握</span>
+                    </div>
+                    <p class="bilibili-study-vocab-critical-text">
+                        所有单词已掌握，请添加新词汇继续学习！
+                    </p>
+                </div>`;
+        }
+
+        // Get mastered words list
+        const masteredList = Object.values(words)
+            .filter(w => w.mastered)
+            .map(w => w.chinese)
+            .join('、') || '暂无';
+
+        // Get recent 10 answers
+        const recent10 = recentAnswers.slice(-10).reverse();
+        const recentAnswersHtml = recent10.length > 0
+            ? recent10.map(a => `<span class="bilibili-study-answer ${a.correct ? 'bilibili-study-answer-correct' : 'bilibili-study-answer-incorrect'}">${a.correct ? '✓' : '✗'}${a.word}</span>`).join(' ')
+            : '暂无答题记录';
+
+        return `
+            <div class="bilibili-study-modal-module" id="bilibili-study-module3-wrapper">
+                <div class="bilibili-study-module-header">
+                    <h3 class="bilibili-study-module-title">📚 单词学习</h3>
+                    <div class="bilibili-study-module-actions">
+                        <button id="bilibili-study-refresh-vocab"
+                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-primary"
+                                title="刷新词库信息，查看最新学习状态（不清除记录）">
+                            🔄 刷新词库
+                        </button>
+                        <button id="bilibili-study-reset-vocab"
+                                class="bilibili-study-btn bilibili-study-btn-sm bilibili-study-btn-secondary"
+                                title="重置所有单词的掌握状态和答题记录，从零开始学习">
+                            🗑️ 重置记录
+                        </button>
+                    </div>
+                </div>
+                <div class="bilibili-study-module-content">
+                    ${vocabWarning}
+                    <div class="bilibili-study-stat-row">
+                        <span class="bilibili-study-stat-label">总单词数：</span>
+                        <span class="bilibili-study-stat-value">${totalWords}</span>
+                    </div>
+                    <div class="bilibili-study-stat-row">
+                        <span class="bilibili-study-stat-label">已掌握：</span>
+                        <span class="bilibili-study-stat-value">${masteredWords}</span>
+                    </div>
+                    <div class="bilibili-study-stat-row">
+                        <span class="bilibili-study-stat-label">可学习：</span>
+                        <span class="bilibili-study-stat-value">${unmasteredCount}${reducedCount > 0 ? `（含${reducedCount}个即将掌握）` : ''}</span>
+                    </div>
+                    <div class="bilibili-study-progress-container">
+                        <div class="bilibili-study-progress-bar">
+                            <div class="bilibili-study-progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <span class="bilibili-study-progress-text">${progressPercent}%</span>
+                    </div>
+                    <div class="bilibili-study-mastered-list">
+                        <span class="bilibili-study-stat-label">已掌握：</span>
+                        <span class="bilibili-study-stat-value">${masteredList}</span>
+                    </div>
+                    <div class="bilibili-study-recent-answers">
+                        <span class="bilibili-study-stat-label">最近答题：</span>
+                        <div class="bilibili-study-answers-list">${recentAnswersHtml}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Render Module 4: Focus suggestions
+    function renderModule4() {
+        const stats = getTodayStats();
+        const wordData = getWordRecords();
+        const words = wordData.words || {};
+        const masteredCount = Object.values(words).filter(w => w.mastered).length;
+
+        const suggestions = [];
+
+        // Suggestion based on distraction time
+        if (stats.distractionTime > 1800) { // > 30 min
+            suggestions.push('今天分心时间较长，建议设置更明确的学习目标。');
+        }
+
+        // Suggestion based on distraction count
+        if (stats.distractionCount > 5) {
+            suggestions.push(`您今天已经分心${stats.distractionCount}次了，建议短暂休息一下。`);
+        }
+
+        // Suggestion based on study time
+        if (stats.studyTime > 7200 && stats.distractionTime < 600) { // > 2h study, < 10min distraction
+            suggestions.push('学习状态非常好！继续保持专注！');
+        }
+
+        // Suggestion based on word learning
+        if (masteredCount > 0) {
+            suggestions.push(`您已经掌握了${masteredCount}个单词，继续加油！`);
+        } else if (Object.keys(words).length > 0) {
+            suggestions.push('尝试开始单词学习，通过测验来巩固记忆。');
+        }
+
+        // Default suggestion
+        if (suggestions.length === 0) {
+            suggestions.push('保持良好的学习习惯，祝您学习愉快！');
+        }
+
+        const suggestionsHtml = suggestions.map(s => `<li>${s}</li>`).join('');
+
+        return `
+            <div class="bilibili-study-modal-module">
+                <h3 class="bilibili-study-module-title bilibili-study-collapsible" id="bilibili-study-suggestions-toggle">
+                    💡 专注建议 <span class="bilibili-study-toggle-icon">▶</span>
+                </h3>
+                <div class="bilibili-study-module-content bilibili-study-collapsible-content" id="bilibili-study-suggestions-content">
+                    <ul class="bilibili-study-suggestions-list">
+                        ${suggestionsHtml}
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+
+    // Render Module 5: Historical trends
+
+    // 注入 VocabPanel 回调到 PanelRenderer
+    PanelRenderer._injectVocabCallbacks({
+        handleRefreshVocabBtn: handleRefreshVocabBtn,
+        handleResetVocabBtn: handleResetVocabBtn,
+        renderModule3: renderModule3,
+        renderModule4: renderModule4
+    });
+
+    // SettingsPanel 注入
+    SettingsPanel._injectAPI({
+        close: PanelRenderer.close,
+        open: PanelRenderer.open,
+        getCurrentTheme: PanelRenderer.getCurrentTheme
+    });
+
+    return {
+        open: PanelRenderer.open,
+        close: PanelRenderer.close,
+        isOpen: PanelRenderer.isOpen,
+        getCurrentTheme: PanelRenderer.getCurrentTheme,
+        detectTheme: PanelRenderer.detectTheme,
+        loadTheme: PanelRenderer.loadTheme,
+        openSettings: SettingsPanel.openSettings
+    };
+
+})();
+
+
 
 // ==========================================
 // WordVerifier Module
