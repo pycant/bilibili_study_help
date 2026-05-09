@@ -220,3 +220,10 @@ elif command -v python3 &>/dev/null && python3 -c "import json; print('ok')" &>/
 else
     echo "$JSON"
 fi
+
+# 输出控制台命令提示（仅 Bash 交互时显示）
+echo ""
+echo "# 如需将数据加载到 Telemetry Dashboard，复制以下命令到浏览器控制台："
+echo "# localStorage.setItem('bilibiliStudy_healthReport', JSON.stringify($(echo "$JSON" | head -1)))"
+echo "# 或加载到全局变量:"
+echo "# window.__bilibiliStudyHealthReport = $(echo "$JSON" | head -1)"

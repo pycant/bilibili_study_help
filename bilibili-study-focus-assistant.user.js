@@ -5197,15 +5197,20 @@ const TelemetryUI = (function() {
             html += '<div class="bilibili-study-telemetry-float-empty">无其他活跃窗口</div>';
         }
 
-        // Harness 健康（尝试从 localStorage 读取，无数据则显示等待状态）
+        // Harness 健康（优先级：window 全局 > localStorage > 默认值）
         var hrPassed = '?', hrWarn = '?', hrFail = '?';
         try {
-            var hrData = localStorage.getItem('bilibiliStudy_healthReport');
-            if (hrData) {
-                var hrParsed = JSON.parse(hrData);
-                hrPassed = hrParsed.summary.passed;
-                hrWarn = hrParsed.summary.warnings;
-                hrFail = hrParsed.summary.failed;
+            // 1. 先检查 window 全局（可由 health-report.sh 输出设置）
+            var hrSource = window.__bilibiliStudyHealthReport;
+            // 2. 再检查 localStorage
+            if (!hrSource) {
+                var hrRaw = localStorage.getItem('bilibiliStudy_healthReport');
+                if (hrRaw) hrSource = JSON.parse(hrRaw);
+            }
+            if (hrSource && hrSource.summary) {
+                hrPassed = hrSource.summary.passed;
+                hrWarn = hrSource.summary.warnings;
+                hrFail = hrSource.summary.failed;
             }
         } catch (e) { /* 读取失败，用默认值 */ }
         html += '<div class="bilibili-study-telemetry-float-section-title">🔬 Harness 健康</div>';
