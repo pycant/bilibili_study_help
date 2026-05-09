@@ -5417,6 +5417,699 @@ const TelemetryUI = (function() {
 })();
 
 // ==========================================
+// SettingsPanel Module (配置编辑器，从 DetailPanel 中拆分)
+// ==========================================
+const SettingsPanel = (function() {
+    var _api = {
+        close: null,
+        open: null,
+        getCurrentTheme: null
+    };
+
+    function _injectAPI(api) {
+        _api = api;
+    }
+
+    var settingsElement = null;
+    var activeSettingsTab = 'periods'; // 'periods' | 'whitelist' | 'vocab'
+
+    function openSettings() {
+        if (settingsElement) {
+            settingsElement.remove();
+            settingsElement = null;
+        }
+
+        settingsElement = document.createElement('div');
+        settingsElement.className = 'bilibili-study-settings-overlay';
+        settingsElement.id = 'bilibili-study-settings-overlay';
+
+        var config = ConfigManager.get();
+        var isDark = _api.getCurrentTheme() === 'dark';
+
+        settingsElement.innerHTML = `
+            <div class="bilibili-study-settings-modal ${isDark ? 'bilibili-study-dark-mode' : ''}">
+                <div class="bilibili-study-settings-header">
+                    <h3>⚙️ 参数设置</h3>
+                    <button class="bilibili-study-modal-close" id="bilibili-study-settings-close">&times;</button>
+                </div>
+                <div class="bilibili-study-settings-tabs">
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'periods' ? 'active' : ''}" data-tab="periods">⏰ 学习时段</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'whitelist' ? 'active' : ''}" data-tab="whitelist">📚 学习视频</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'vocab' ? 'active' : ''}" data-tab="vocab">📝 词库管理</button>
+                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'intervention' ? 'active' : ''}" data-tab="intervention">🎯 干预设置</button>
+                </div>
+                <div class="bilibili-study-settings-body" id="bilibili-study-settings-body">
+                    ${renderSettingsContent(activeSettingsTab, config)}
+                </div>
+                <div class="bilibili-study-settings-footer">
+                    <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-settings-cancel">取消</button>
+                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-settings-save">💾 保存</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(settingsElement);
+
+        // v1.2.5: 注册到 ModalManager
+        ModalManager.register('settings-modal', ModalManager.LEVELS.SETTINGS, settingsElement);
+
+        bindSettingsEvents();
+    }
+
+    function closeSettings() {
+        if (settingsElement) {
+            // v1.2.5: 从 ModalManager 注销
+            ModalManager.dismiss('settings-modal');
+            settingsElement = null;
+        }
+    }
+
+    function renderSettingsContent(tab, config) {
+        switch (tab) {
+            case 'periods': return renderPeriodsSettings(config);
+            case 'whitelist': return renderWhitelistSettings(config);
+            case 'vocab': return renderVocabSettings(config);
+            case 'intervention': return renderInterventionSettings(config);
+            default: return renderPeriodsSettings(config);
+        }
+    }
+
+    function renderPeriodsSettings(config) {
+        var periods = config.studyPeriods || [];
+        var periodsHtml = periods.map(function(p, i) {
+            return `
+            <div class="bilibili-study-settings-period-item" data-index="${i}">
+                <input type="time" class="bilibili-study-period-start" value="${p[0]}" data-index="${i}">
+                <span class="bilibili-study-settings-period-arrow">→</span>
+                <input type="time" class="bilibili-study-period-end" value="${p[1]}" data-index="${i}">
+                <button class="bilibili-study-settings-remove-btn" data-index="${i}" title="删除此时段">✕</button>
+            </div>
+        `;
+        }).join('');
+
+        if (!periodsHtml) {
+            periodsHtml = '<div class="bilibili-study-settings-empty-hint">暂无学习时段，请点击下方添加</div>';
+        }
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">学习时段</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">设定每天的专注学习时间段，仅在此时段内才会触发专注提醒</p>
+                <div id="bilibili-study-periods-list">
+                    ${periodsHtml}
+                </div>
+                <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-add-period" style="margin-top: 8px; font-size: 13px;">+ 添加时段</button>
+            </div>
+        `;
+    }
+
+    function renderWhitelistSettings(config) {
+        var whitelist = ConfigManager.getWhitelistArray();
+        var listHtml = whitelist.map(function(item) {
+            return `
+            <div class="bilibili-study-settings-whitelist-item" data-bv="${item.bv}">
+                <div class="bilibili-study-settings-whitelist-info">
+                    <div class="bilibili-study-settings-whitelist-name">${item.name}</div>
+                    <div class="bilibili-study-settings-whitelist-bv">${item.bv}</div>
+                </div>
+                <button class="bilibili-study-settings-remove-btn" data-bv="${item.bv}" title="移除此视频">✕</button>
+            </div>
+        `;
+        }).join('');
+
+        if (!listHtml) {
+            listHtml = '<div class="bilibili-study-settings-empty-hint">白名单为空，请添加学习视频</div>';
+        }
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">学习视频（白名单）</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">白名单中的视频不会触发专注干预</p>
+                <div id="bilibili-study-whitelist-list">
+                    ${listHtml}
+                </div>
+                <div class="bilibili-study-settings-add-row" style="margin-top: 10px;">
+                    <input type="text" id="bilibili-study-new-bv" placeholder="输入BV号（如 BV1xx411c7mD）">
+                    <input type="text" id="bilibili-study-new-name" placeholder="课程名称" style="max-width: 120px;">
+                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-add-whitelist-btn" style="white-space: nowrap; font-size: 13px;">添加</button>
+                </div>
+                <div id="bilibili-study-whitelist-error" class="bilibili-study-settings-error"></div>
+            </div>
+        `;
+    }
+
+    function renderVocabSettings(config) {
+        var vocab = config.vocabulary || [];
+        var total = vocab.length;
+        // 格式化为每行一个 "中文:英文"
+        var vocabText = vocab.join('\n');
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">词库管理</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 4px 0;">当前词库共 <strong>${total}</strong> 个词条</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">格式：每行一个词条，中文和英文用英文冒号分隔，如 "学习:study"</p>
+                <div class="bilibili-study-settings-row">
+                    <textarea id="bilibili-study-vocab-textarea" placeholder="学习:study&#10;专注:focus&#10;进步:progress">${vocabText}</textarea>
+                </div>
+                <div id="bilibili-study-vocab-error" class="bilibili-study-settings-error"></div>
+                <div id="bilibili-study-vocab-preview" class="bilibili-study-settings-hint"></div>
+            </div>
+        `;
+    }
+
+    // v1.2.4: 干预设置 tab
+    function renderInterventionSettings(config) {
+        var level = config.interventionLevel || 'standard';
+        var visualLevel = config.visualEffectLevel || 'heavy';
+        var resetStrategy = config.resetStrategy || 'period';
+        var resetDuration = config.resetDuration || 30;
+        var resetInterval = config.resetInterval || 30;
+
+        // 干预等级描述
+        var levelDescriptions = {
+            gentle:   '温和：分心3分钟才开始干预，弹窗间隔较长',
+            standard: '标准：分心1分钟开始干预，平衡提醒与体验',
+            strict:   '严格：分心30秒即干预，弹窗密集，强力约束'
+        };
+
+        // 视觉效果描述
+        var visualDescriptions = {
+            none:   '无视觉效果：页面外观不变，仅弹窗提醒',
+            light:  '轻度：轻微灰度变化，视觉影响较小',
+            medium: '中度：明显色彩翻转和灰度，保持可读性',
+            heavy:  '重度：强烈色彩翻转和灰度，视觉冲击大'
+        };
+
+        // 各等级的阶段时间表
+        var stageTimelines = {
+            gentle:   ['3min 视觉', '10min 弹窗2min', '20min 弹窗1min', '40min 弹窗30s'],
+            standard: ['1min 视觉', '3min 弹窗1min', '10min 弹窗30s', '20min 弹窗15s'],
+            strict:   ['30s 视觉', '1min 弹窗30s', '3min 弹窗15s', '10min 弹窗10s']
+        };
+        var timeline = stageTimelines[level] || stageTimelines.standard;
+
+        return `
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🎯 干预等级</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制干预的触发速度和弹窗频率</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="gentle" ${level === 'gentle' ? 'checked' : ''}>
+                        <span>🕊️ 温和</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="standard" ${level === 'standard' ? 'checked' : ''}>
+                        <span>⚖️ 标准</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="interventionLevel" value="strict" ${level === 'strict' ? 'checked' : ''}>
+                        <span>🔥 严格</span>
+                    </label>
+                </div>
+                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${levelDescriptions[level] || ''}</p>
+                <div class="bilibili-study-stage-timeline">
+                    <p class="stage-timeline-title">阶段时间表：</p>
+                    ${timeline.map(function(t, i) { return '<div class="bilibili-study-stage-timeline-item">阶段' + (i + 1) + ': ' + t + '</div>'; }).join('')}
+                </div>
+            </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">👁️ 视觉效果强度</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制分心时页面的色彩翻转和灰度程度</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="none" ${visualLevel === 'none' ? 'checked' : ''}>
+                        <span>❌ 无</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="light" ${visualLevel === 'light' ? 'checked' : ''}>
+                        <span>🟢 轻度</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="medium" ${visualLevel === 'medium' ? 'checked' : ''}>
+                        <span>🟡 中度</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="visualEffectLevel" value="heavy" ${visualLevel === 'heavy' ? 'checked' : ''}>
+                        <span>🔴 重度</span>
+                    </label>
+                </div>
+                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${visualDescriptions[visualLevel] || ''}</p>
+            </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🔄 干预重置策略</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">决定干预状态何时重置回初始</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="period" ${resetStrategy === 'period' ? 'checked' : ''}>
+                        <span>⏰ 跟随时段</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="duration" ${resetStrategy === 'duration' ? 'checked' : ''}>
+                        <span>⏱️ 固定时长</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="resetStrategy" value="interval" ${resetStrategy === 'interval' ? 'checked' : ''}>
+                        <span>📐 固定间隔</span>
+                    </label>
+                </div>
+                <div id="bilibili-study-reset-duration-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'duration' ? 'flex' : 'none'};">
+                    <label class="bilibili-study-reset-label">累计学习</label>
+                    <input type="number" id="bilibili-study-reset-duration" value="${resetDuration}" min="5" max="120"
+                           class="bilibili-study-reset-input">
+                    <span class="bilibili-study-reset-label">分钟后重置</span>
+                </div>
+                <div id="bilibili-study-reset-interval-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'interval' ? 'flex' : 'none'};">
+                    <label class="bilibili-study-reset-label">离开超过</label>
+                    <input type="number" id="bilibili-study-reset-interval" value="${resetInterval}" min="5" max="120"
+                           class="bilibili-study-reset-input">
+                    <span class="bilibili-study-reset-label">分钟后重置</span>
+                </div>
+            </div>
+
+            <div class="bilibili-study-settings-group">
+                <p class="bilibili-study-settings-group-title">🚀 自动导航（P0）</p>
+                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">关闭分心弹窗后显示3秒倒计时，结束后自动跳转到白名单视频</p>
+                <div class="bilibili-study-settings-option-group">
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="autoNavigate" value="true" ${config.autoNavigate ? 'checked' : ''}>
+                        <span>✅ 开启</span>
+                    </label>
+                    <label class="bilibili-study-settings-radio">
+                        <input type="radio" name="autoNavigate" value="false" ${!config.autoNavigate ? 'checked' : ''}>
+                        <span>❌ 关闭</span>
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+
+    function bindSettingsEvents() {
+        // 关闭按钮
+        var closeBtn = document.getElementById('bilibili-study-settings-close');
+        if (closeBtn) closeBtn.addEventListener('click', closeSettings);
+
+        // 点击遮罩关闭
+        if (settingsElement) {
+            settingsElement.addEventListener('click', function(e) {
+                if (e.target === settingsElement) closeSettings();
+            });
+        }
+
+        // 取消按钮
+        var cancelBtn = document.getElementById('bilibili-study-settings-cancel');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeSettings);
+
+        // Tab 切换
+        var tabs = settingsElement.querySelectorAll('.bilibili-study-settings-tab');
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                activeSettingsTab = this.dataset.tab;
+                // 更新 tab 样式
+                tabs.forEach(function(t) { t.classList.remove('active'); });
+                this.classList.add('active');
+                // 更新内容区
+                var body = document.getElementById('bilibili-study-settings-body');
+                if (body) {
+                    var config = ConfigManager.get();
+                    body.innerHTML = renderSettingsContent(activeSettingsTab, config);
+                    bindSettingsTabEvents();
+                }
+            });
+        });
+
+        // 保存按钮
+        var saveBtn = document.getElementById('bilibili-study-settings-save');
+        if (saveBtn) saveBtn.addEventListener('click', saveSettings);
+
+        // 各 tab 内的事件
+        bindSettingsTabEvents();
+    }
+
+    function bindSettingsTabEvents() {
+        // === 学习时段 tab ===
+        // 删除时段
+        document.querySelectorAll('.bilibili-study-settings-period-item .bilibili-study-settings-remove-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var idx = parseInt(this.dataset.index);
+                this.closest('.bilibili-study-settings-period-item').remove();
+                // 重新编号
+                document.querySelectorAll('.bilibili-study-settings-period-item').forEach(function(item, i) {
+                    item.dataset.index = i;
+                    item.querySelectorAll('input').forEach(function(inp) { inp.dataset.index = i; });
+                    item.querySelector('.bilibili-study-settings-remove-btn').dataset.index = i;
+                });
+            });
+        });
+
+        // 添加时段
+        var addPeriodBtn = document.getElementById('bilibili-study-add-period');
+        if (addPeriodBtn) {
+            addPeriodBtn.addEventListener('click', function() {
+                var list = document.getElementById('bilibili-study-periods-list');
+                if (!list) return;
+                var idx = list.querySelectorAll('.bilibili-study-settings-period-item').length;
+                var div = document.createElement('div');
+                div.className = 'bilibili-study-settings-period-item';
+                div.dataset.index = idx;
+                div.innerHTML = `
+                    <input type="time" class="bilibili-study-period-start" value="08:00" data-index="${idx}">
+                    <span class="bilibili-study-settings-period-arrow">→</span>
+                    <input type="time" class="bilibili-study-period-end" value="12:00" data-index="${idx}">
+                    <button class="bilibili-study-settings-remove-btn" data-index="${idx}" title="删除此时段">✕</button>
+                `;
+                list.appendChild(div);
+                // 绑定删除事件
+                div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
+                    div.remove();
+                });
+            });
+        }
+
+        // v1.2.4: === 干预设置 tab ===
+        // resetStrategy 联动显示/隐藏参数输入框
+        if (settingsElement) {
+            settingsElement.querySelectorAll('input[name="resetStrategy"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    var durationRow = document.getElementById('bilibili-study-reset-duration-row');
+                    var intervalRow = document.getElementById('bilibili-study-reset-interval-row');
+                    if (durationRow) durationRow.style.display = this.value === 'duration' ? 'flex' : 'none';
+                    if (intervalRow) intervalRow.style.display = this.value === 'interval' ? 'flex' : 'none';
+                });
+            });
+        }
+
+        // 干预等级切换时更新描述和时间表
+        if (settingsElement) {
+            settingsElement.querySelectorAll('input[name="interventionLevel"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    // 重新渲染干预设置面板以更新描述
+                    var body = document.getElementById('bilibili-study-settings-body');
+                    if (body) {
+                        var config = ConfigManager.get();
+                        // 临时更新选择的等级
+                        config.interventionLevel = this.value;
+                        body.innerHTML = renderSettingsContent('intervention', config);
+                        bindSettingsTabEvents();
+                    }
+                });
+            });
+        }
+
+        // 视觉效果切换时更新描述
+        if (settingsElement) {
+            settingsElement.querySelectorAll('input[name="visualEffectLevel"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    var body = document.getElementById('bilibili-study-settings-body');
+                    if (body) {
+                        var config = ConfigManager.get();
+                        config.visualEffectLevel = this.value;
+                        body.innerHTML = renderSettingsContent('intervention', config);
+                        bindSettingsTabEvents();
+                    }
+                });
+            });
+        }
+
+        // === 白名单 tab ===
+        // 删除白名单项
+        document.querySelectorAll('.bilibili-study-settings-whitelist-item .bilibili-study-settings-remove-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                this.closest('.bilibili-study-settings-whitelist-item').remove();
+            });
+        });
+
+        // 添加白名单
+        var addWhitelistBtn = document.getElementById('bilibili-study-add-whitelist-btn');
+        if (addWhitelistBtn) {
+            addWhitelistBtn.addEventListener('click', function() {
+                var bvInput = document.getElementById('bilibili-study-new-bv');
+                var nameInput = document.getElementById('bilibili-study-new-name');
+                var errorDiv = document.getElementById('bilibili-study-whitelist-error');
+                var bv = (bvInput.value || '').trim();
+                var name = (nameInput.value || '').trim();
+
+                // 验证
+                if (!bv) {
+                    if (errorDiv) errorDiv.textContent = '请输入BV号';
+                    return;
+                }
+                if (!/^BV[\w]+$/i.test(bv)) {
+                    if (errorDiv) errorDiv.textContent = 'BV号格式不正确，应以 BV 开头';
+                    return;
+                }
+                // 检查重复
+                var existing = document.querySelectorAll('.bilibili-study-settings-whitelist-item');
+                for (var i = 0; i < existing.length; i++) {
+                    if (existing[i].dataset.bv === bv) {
+                        if (errorDiv) errorDiv.textContent = '该BV号已在白名单中';
+                        return;
+                    }
+                }
+
+                if (errorDiv) errorDiv.textContent = '';
+
+                // 添加到列表
+                var list = document.getElementById('bilibili-study-whitelist-list');
+                if (list) {
+                    var div = document.createElement('div');
+                    div.className = 'bilibili-study-settings-whitelist-item';
+                    div.dataset.bv = bv;
+                    div.innerHTML = `
+                        <div class="bilibili-study-settings-whitelist-info">
+                            <div class="bilibili-study-settings-whitelist-name">${name || bv}</div>
+                            <div class="bilibili-study-settings-whitelist-bv">${bv}</div>
+                        </div>
+                        <button class="bilibili-study-settings-remove-btn" data-bv="${bv}" title="移除此视频">✕</button>
+                    `;
+                    list.appendChild(div);
+                    div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
+                        div.remove();
+                    });
+                    bvInput.value = '';
+                    nameInput.value = '';
+                }
+            });
+        }
+
+        // === 词库 tab ===
+        var vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
+        if (vocabTextarea) {
+            // 实时预览词数
+            vocabTextarea.addEventListener('input', function() {
+                var lines = this.value.split('\n').filter(function(l) { return l.trim(); });
+                var validLines = lines.filter(function(l) { return /^.+:.+$/.test(l.trim()); });
+                var invalidCount = lines.length - validLines.length;
+                var previewDiv = document.getElementById('bilibili-study-vocab-preview');
+                if (previewDiv) {
+                    if (invalidCount > 0) {
+                        previewDiv.innerHTML = '解析到 <strong>' + validLines.length + '</strong> 个有效词条，<span class="bilibili-study-vocab-error-count">' + invalidCount + ' 行格式错误</span>（需使用 "中文:英文" 格式）';
+                    } else {
+                        previewDiv.innerHTML = '解析到 <strong>' + validLines.length + '</strong> 个有效词条';
+                    }
+                }
+            });
+            // 触发一次预览
+            vocabTextarea.dispatchEvent(new Event('input'));
+        }
+    }
+
+    function saveSettings() {
+        var errors = [];
+        var hasChanges = false;
+
+        // === 保存学习时段 ===（只保存当前激活的 tab）
+        if (activeSettingsTab === 'periods') {
+            var periodItems = settingsElement ? settingsElement.querySelectorAll('.bilibili-study-settings-period-item') : null;
+            if (periodItems) {
+                var newPeriods = [];
+                periodItems.forEach(function(item) {
+                    var start = item.querySelector('.bilibili-study-period-start') ? item.querySelector('.bilibili-study-period-start').value : null;
+                    var end = item.querySelector('.bilibili-study-period-end') ? item.querySelector('.bilibili-study-period-end').value : null;
+                    if (start && end) {
+                        newPeriods.push([start, end]);
+                    } else if (start || end) {
+                        errors.push('存在不完整的学习时段（缺少开始或结束时间）');
+                    }
+                });
+                var oldPeriods = ConfigManager.get().studyPeriods || [];
+                if (JSON.stringify(newPeriods) !== JSON.stringify(oldPeriods)) {
+                    ConfigManager.save({ studyPeriods: newPeriods });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // === 保存白名单 ===
+        if (activeSettingsTab === 'whitelist') {
+            var whitelistItems = settingsElement ? settingsElement.querySelectorAll('.bilibili-study-settings-whitelist-item') : null;
+            if (whitelistItems && whitelistItems.length > 0) {
+                var newWhitelist = {};
+                whitelistItems.forEach(function(item) {
+                    var bv = item.dataset.bv;
+                    var nameEl = item.querySelector('.bilibili-study-settings-whitelist-name');
+                    var name = nameEl ? nameEl.textContent : bv;
+                    if (bv) {
+                        newWhitelist[bv] = { name: name, addedAt: Date.now() };
+                    }
+                });
+                var oldWhitelist = ConfigManager.get().whitelist || {};
+                if (JSON.stringify(newWhitelist) !== JSON.stringify(oldWhitelist)) {
+                    ConfigManager.save({ whitelist: newWhitelist });
+                    hasChanges = true;
+                }
+            } else if (whitelistItems && whitelistItems.length === 0) {
+                // 用户主动清空了所有白名单
+                var oldWhitelist = ConfigManager.get().whitelist || {};
+                if (Object.keys(oldWhitelist).length > 0) {
+                    ConfigManager.save({ whitelist: {} });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // === 保存词库 ===
+        if (activeSettingsTab === 'vocab') {
+            var vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
+            if (vocabTextarea) {
+                var lines = vocabTextarea.value.split('\n').filter(function(l) { return l.trim(); });
+                var newVocab = [];
+                var invalidLines = [];
+
+                lines.forEach(function(line, i) {
+                    var trimmed = line.trim();
+                    if (/^.+:.+$/.test(trimmed)) {
+                        var parts = trimmed.split(':');
+                        var chinese = parts[0].trim();
+                        var english = parts.slice(1).join(':').trim().toLowerCase();
+                        if (chinese && english) {
+                            newVocab.push(chinese + ':' + english);
+                        }
+                    } else if (trimmed) {
+                        invalidLines.push(i + 1);
+                    }
+                });
+
+                if (invalidLines.length > 0) {
+                    errors.push('词库第 ' + invalidLines.slice(0, 5).join(', ') + (invalidLines.length > 5 ? '...' : '') + ' 行格式错误，需使用 "中文:英文" 格式');
+                }
+
+                var oldVocab = ConfigManager.get().vocabulary || [];
+                if (newVocab.length > 0 && JSON.stringify(newVocab) !== JSON.stringify(oldVocab)) {
+                    ConfigManager.save({ vocabulary: newVocab });
+                    hasChanges = true;
+                } else if (newVocab.length === 0 && oldVocab.length > 0) {
+                    errors.push('词库不能为空，至少需要1个词条');
+                }
+            }
+        }
+
+        // v1.2.4: === 保存干预设置 ===
+        if (activeSettingsTab === 'intervention') {
+            var levelRadio = settingsElement ? settingsElement.querySelector('input[name="interventionLevel"]:checked') : null;
+            var visualRadio = settingsElement ? settingsElement.querySelector('input[name="visualEffectLevel"]:checked') : null;
+            var strategyRadio = settingsElement ? settingsElement.querySelector('input[name="resetStrategy"]:checked') : null;
+            var autoNavRadio = settingsElement ? settingsElement.querySelector('input[name="autoNavigate"]:checked') : null;
+
+            var newLevel = levelRadio ? levelRadio.value : null;
+            var newVisual = visualRadio ? visualRadio.value : null;
+            var newStrategy = strategyRadio ? strategyRadio.value : null;
+
+            var config = ConfigManager.get();
+
+            if (newLevel && newLevel !== config.interventionLevel) {
+                ConfigManager.save({ interventionLevel: newLevel });
+                hasChanges = true;
+            }
+            if (newVisual && newVisual !== config.visualEffectLevel) {
+                ConfigManager.save({ visualEffectLevel: newVisual });
+                hasChanges = true;
+            }
+            if (newStrategy && newStrategy !== config.resetStrategy) {
+                ConfigManager.save({ resetStrategy: newStrategy });
+                hasChanges = true;
+            }
+
+            // 保存固定时长/间隔参数
+            var durationInput = document.getElementById('bilibili-study-reset-duration');
+            var intervalInput = document.getElementById('bilibili-study-reset-interval');
+            if (durationInput) {
+                var dur = parseInt(durationInput.value) || 30;
+                if (dur !== config.resetDuration) {
+                    ConfigManager.save({ resetDuration: Math.max(5, Math.min(120, dur)) });
+                    hasChanges = true;
+                }
+            }
+            if (intervalInput) {
+                var intv = parseInt(intervalInput.value) || 30;
+                if (intv !== config.resetInterval) {
+                    ConfigManager.save({ resetInterval: Math.max(5, Math.min(120, intv)) });
+                    hasChanges = true;
+                }
+            }
+
+            // v1.3.0: 保存自动导航设置
+            if (autoNavRadio) {
+                var newAutoNav = autoNavRadio.value === 'true';
+                if (newAutoNav !== config.autoNavigate) {
+                    ConfigManager.save({ autoNavigate: newAutoNav });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // 反馈
+        if (errors.length > 0) {
+            showSettingsToast(errors[0], 'error');
+            return;
+        }
+
+        closeSettings();
+
+        if (hasChanges) {
+            // v1.4.1
+            DebugTelemetry.incrementMetric('settingsChanges');
+            showSettingsToast('✅ 配置已保存，正在刷新面板…', 'success');
+            // 刷新详情面板
+            setTimeout(function() {
+                _api.close(); // 关闭当前详情面板
+                setTimeout(function() { _api.open(); }, 200); // 重新打开以加载新配置
+            }, 800);
+        } else {
+            showSettingsToast('配置无变化', 'success');
+        }
+    }
+
+    // 设置面板的 Toast 反馈
+    function showSettingsToast(message, type) {
+        var existing = document.querySelector('.bilibili-study-settings-toast');
+        if (existing) existing.remove();
+
+        var toast = document.createElement('div');
+        toast.className = 'bilibili-study-settings-toast bilibili-study-settings-toast-' + type;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(function() {
+            toast.classList.add('show');
+        });
+
+        setTimeout(function() {
+            toast.classList.remove('show');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
+    }
+
+    return {
+        openSettings: openSettings,
+        closeSettings: closeSettings,
+        _injectAPI: _injectAPI
+    };
+})();
+
+// ==========================================
 // DetailPanel Module
 // ==========================================
 const DetailPanel = (function() {
@@ -6095,7 +6788,7 @@ const DetailPanel = (function() {
         if (settingsBtn) {
             settingsBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                openSettings();
+                SettingsPanel.openSettings();
             });
         }
 
@@ -6270,669 +6963,12 @@ const DetailPanel = (function() {
         });
     }
 
-    // ==========================================
-    // Settings Panel (配置编辑器)
-    // ==========================================
-    let settingsElement = null;
-    let activeSettingsTab = 'periods'; // 'periods' | 'whitelist' | 'vocab'
-
-    function openSettings() {
-        if (settingsElement) {
-            settingsElement.remove();
-            settingsElement = null;
-        }
-
-        settingsElement = document.createElement('div');
-        settingsElement.className = 'bilibili-study-settings-overlay';
-        settingsElement.id = 'bilibili-study-settings-overlay';
-
-        const config = ConfigManager.get();
-        const isDark = currentTheme === 'dark';
-
-        settingsElement.innerHTML = `
-            <div class="bilibili-study-settings-modal ${isDark ? 'bilibili-study-dark-mode' : ''}">
-                <div class="bilibili-study-settings-header">
-                    <h3>⚙️ 参数设置</h3>
-                    <button class="bilibili-study-modal-close" id="bilibili-study-settings-close">&times;</button>
-                </div>
-                <div class="bilibili-study-settings-tabs">
-                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'periods' ? 'active' : ''}" data-tab="periods">⏰ 学习时段</button>
-                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'whitelist' ? 'active' : ''}" data-tab="whitelist">📚 学习视频</button>
-                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'vocab' ? 'active' : ''}" data-tab="vocab">📝 词库管理</button>
-                    <button class="bilibili-study-settings-tab ${activeSettingsTab === 'intervention' ? 'active' : ''}" data-tab="intervention">🎯 干预设置</button>
-                </div>
-                <div class="bilibili-study-settings-body" id="bilibili-study-settings-body">
-                    ${renderSettingsContent(activeSettingsTab, config)}
-                </div>
-                <div class="bilibili-study-settings-footer">
-                    <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-settings-cancel">取消</button>
-                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-settings-save">💾 保存</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(settingsElement);
-
-        // v1.2.5: 注册到 ModalManager
-        ModalManager.register('settings-modal', ModalManager.LEVELS.SETTINGS, settingsElement);
-
-        bindSettingsEvents();
-    }
-
-    function closeSettings() {
-        if (settingsElement) {
-            // v1.2.5: 从 ModalManager 注销
-            ModalManager.dismiss('settings-modal');
-            settingsElement = null;
-        }
-    }
-
-    function renderSettingsContent(tab, config) {
-        switch (tab) {
-            case 'periods': return renderPeriodsSettings(config);
-            case 'whitelist': return renderWhitelistSettings(config);
-            case 'vocab': return renderVocabSettings(config);
-            case 'intervention': return renderInterventionSettings(config);
-            default: return renderPeriodsSettings(config);
-        }
-    }
-
-    function renderPeriodsSettings(config) {
-        const periods = config.studyPeriods || [];
-        let periodsHtml = periods.map((p, i) => `
-            <div class="bilibili-study-settings-period-item" data-index="${i}">
-                <input type="time" class="bilibili-study-period-start" value="${p[0]}" data-index="${i}">
-                <span class="bilibili-study-settings-period-arrow">→</span>
-                <input type="time" class="bilibili-study-period-end" value="${p[1]}" data-index="${i}">
-                <button class="bilibili-study-settings-remove-btn" data-index="${i}" title="删除此时段">✕</button>
-            </div>
-        `).join('');
-
-        if (!periodsHtml) {
-            periodsHtml = '<div class="bilibili-study-settings-empty-hint">暂无学习时段，请点击下方添加</div>';
-        }
-
-        return `
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">学习时段</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">设定每天的专注学习时间段，仅在此时段内才会触发专注提醒</p>
-                <div id="bilibili-study-periods-list">
-                    ${periodsHtml}
-                </div>
-                <button class="bilibili-study-btn bilibili-study-btn-secondary" id="bilibili-study-add-period" style="margin-top: 8px; font-size: 13px;">+ 添加时段</button>
-            </div>
-        `;
-    }
-
-    function renderWhitelistSettings(config) {
-        const whitelist = ConfigManager.getWhitelistArray();
-        let listHtml = whitelist.map(item => `
-            <div class="bilibili-study-settings-whitelist-item" data-bv="${item.bv}">
-                <div class="bilibili-study-settings-whitelist-info">
-                    <div class="bilibili-study-settings-whitelist-name">${item.name}</div>
-                    <div class="bilibili-study-settings-whitelist-bv">${item.bv}</div>
-                </div>
-                <button class="bilibili-study-settings-remove-btn" data-bv="${item.bv}" title="移除此视频">✕</button>
-            </div>
-        `).join('');
-
-        if (!listHtml) {
-            listHtml = '<div class="bilibili-study-settings-empty-hint">白名单为空，请添加学习视频</div>';
-        }
-
-        return `
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">学习视频（白名单）</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">白名单中的视频不会触发专注干预</p>
-                <div id="bilibili-study-whitelist-list">
-                    ${listHtml}
-                </div>
-                <div class="bilibili-study-settings-add-row" style="margin-top: 10px;">
-                    <input type="text" id="bilibili-study-new-bv" placeholder="输入BV号（如 BV1xx411c7mD）">
-                    <input type="text" id="bilibili-study-new-name" placeholder="课程名称" style="max-width: 120px;">
-                    <button class="bilibili-study-btn bilibili-study-btn-primary" id="bilibili-study-add-whitelist-btn" style="white-space: nowrap; font-size: 13px;">添加</button>
-                </div>
-                <div id="bilibili-study-whitelist-error" class="bilibili-study-settings-error"></div>
-            </div>
-        `;
-    }
-
-    function renderVocabSettings(config) {
-        const vocab = config.vocabulary || [];
-        const total = vocab.length;
-        // 格式化为每行一个 "中文:英文"
-        const vocabText = vocab.join('\n');
-
-        return `
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">词库管理</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 4px 0;">当前词库共 <strong>${total}</strong> 个词条</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">格式：每行一个词条，中文和英文用英文冒号分隔，如 "学习:study"</p>
-                <div class="bilibili-study-settings-row">
-                    <textarea id="bilibili-study-vocab-textarea" placeholder="学习:study&#10;专注:focus&#10;进步:progress">${vocabText}</textarea>
-                </div>
-                <div id="bilibili-study-vocab-error" class="bilibili-study-settings-error"></div>
-                <div id="bilibili-study-vocab-preview" class="bilibili-study-settings-hint"></div>
-            </div>
-        `;
-    }
-
-    // v1.2.4: 干预设置 tab
-    function renderInterventionSettings(config) {
-        const level = config.interventionLevel || 'standard';
-        const visualLevel = config.visualEffectLevel || 'heavy';
-        const resetStrategy = config.resetStrategy || 'period';
-        const resetDuration = config.resetDuration || 30;
-        const resetInterval = config.resetInterval || 30;
-
-        // 干预等级描述
-        const levelDescriptions = {
-            gentle:   '温和：分心3分钟才开始干预，弹窗间隔较长',
-            standard: '标准：分心1分钟开始干预，平衡提醒与体验',
-            strict:   '严格：分心30秒即干预，弹窗密集，强力约束'
-        };
-
-        // 视觉效果描述
-        const visualDescriptions = {
-            none:   '无视觉效果：页面外观不变，仅弹窗提醒',
-            light:  '轻度：轻微灰度变化，视觉影响较小',
-            medium: '中度：明显色彩翻转和灰度，保持可读性',
-            heavy:  '重度：强烈色彩翻转和灰度，视觉冲击大'
-        };
-
-        // 各等级的阶段时间表
-        const stageTimelines = {
-            gentle:   ['3min 视觉', '10min 弹窗2min', '20min 弹窗1min', '40min 弹窗30s'],
-            standard: ['1min 视觉', '3min 弹窗1min', '10min 弹窗30s', '20min 弹窗15s'],
-            strict:   ['30s 视觉', '1min 弹窗30s', '3min 弹窗15s', '10min 弹窗10s']
-        };
-        const timeline = stageTimelines[level] || stageTimelines.standard;
-
-        return `
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">🎯 干预等级</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制干预的触发速度和弹窗频率</p>
-                <div class="bilibili-study-settings-option-group">
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="interventionLevel" value="gentle" ${level === 'gentle' ? 'checked' : ''}>
-                        <span>🕊️ 温和</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="interventionLevel" value="standard" ${level === 'standard' ? 'checked' : ''}>
-                        <span>⚖️ 标准</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="interventionLevel" value="strict" ${level === 'strict' ? 'checked' : ''}>
-                        <span>🔥 严格</span>
-                    </label>
-                </div>
-                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${levelDescriptions[level] || ''}</p>
-                <div class="bilibili-study-stage-timeline">
-                    <p class="stage-timeline-title">阶段时间表：</p>
-                    ${timeline.map((t, i) => `<div class="bilibili-study-stage-timeline-item">阶段${i + 1}: ${t}</div>`).join('')}
-                </div>
-            </div>
-
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">👁️ 视觉效果强度</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">控制分心时页面的色彩翻转和灰度程度</p>
-                <div class="bilibili-study-settings-option-group">
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="visualEffectLevel" value="none" ${visualLevel === 'none' ? 'checked' : ''}>
-                        <span>❌ 无</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="visualEffectLevel" value="light" ${visualLevel === 'light' ? 'checked' : ''}>
-                        <span>🟢 轻度</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="visualEffectLevel" value="medium" ${visualLevel === 'medium' ? 'checked' : ''}>
-                        <span>🟡 中度</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="visualEffectLevel" value="heavy" ${visualLevel === 'heavy' ? 'checked' : ''}>
-                        <span>🔴 重度</span>
-                    </label>
-                </div>
-                <p class="bilibili-study-settings-hint" style="margin: 6px 0 0 0; font-style: italic;">${visualDescriptions[visualLevel] || ''}</p>
-            </div>
-
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">🔄 干预重置策略</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">决定干预状态何时重置回初始</p>
-                <div class="bilibili-study-settings-option-group">
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="resetStrategy" value="period" ${resetStrategy === 'period' ? 'checked' : ''}>
-                        <span>⏰ 跟随时段</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="resetStrategy" value="duration" ${resetStrategy === 'duration' ? 'checked' : ''}>
-                        <span>⏱️ 固定时长</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="resetStrategy" value="interval" ${resetStrategy === 'interval' ? 'checked' : ''}>
-                        <span>📐 固定间隔</span>
-                    </label>
-                </div>
-                <div id="bilibili-study-reset-duration-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'duration' ? 'flex' : 'none'};">
-                    <label class="bilibili-study-reset-label">累计学习</label>
-                    <input type="number" id="bilibili-study-reset-duration" value="${resetDuration}" min="5" max="120"
-                           class="bilibili-study-reset-input">
-                    <span class="bilibili-study-reset-label">分钟后重置</span>
-                </div>
-                <div id="bilibili-study-reset-interval-row" class="bilibili-study-reset-param-row" style="display: ${resetStrategy === 'interval' ? 'flex' : 'none'};">
-                    <label class="bilibili-study-reset-label">离开超过</label>
-                    <input type="number" id="bilibili-study-reset-interval" value="${resetInterval}" min="5" max="120"
-                           class="bilibili-study-reset-input">
-                    <span class="bilibili-study-reset-label">分钟后重置</span>
-                </div>
-            </div>
-
-            <div class="bilibili-study-settings-group">
-                <p class="bilibili-study-settings-group-title">🚀 自动导航（P0）</p>
-                <p class="bilibili-study-settings-hint" style="margin: 0 0 10px 0;">关闭分心弹窗后显示3秒倒计时，结束后自动跳转到白名单视频</p>
-                <div class="bilibili-study-settings-option-group">
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="autoNavigate" value="true" ${config.autoNavigate ? 'checked' : ''}>
-                        <span>✅ 开启</span>
-                    </label>
-                    <label class="bilibili-study-settings-radio">
-                        <input type="radio" name="autoNavigate" value="false" ${!config.autoNavigate ? 'checked' : ''}>
-                        <span>❌ 关闭</span>
-                    </label>
-                </div>
-            </div>
-        `;
-    }
-
-    function bindSettingsEvents() {
-        // 关闭按钮
-        const closeBtn = document.getElementById('bilibili-study-settings-close');
-        if (closeBtn) closeBtn.addEventListener('click', closeSettings);
-
-        // 点击遮罩关闭
-        if (settingsElement) {
-            settingsElement.addEventListener('click', function(e) {
-                if (e.target === settingsElement) closeSettings();
-            });
-        }
-
-        // 取消按钮
-        const cancelBtn = document.getElementById('bilibili-study-settings-cancel');
-        if (cancelBtn) cancelBtn.addEventListener('click', closeSettings);
-
-        // Tab 切换
-        const tabs = settingsElement.querySelectorAll('.bilibili-study-settings-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-                activeSettingsTab = this.dataset.tab;
-                // 更新 tab 样式
-                tabs.forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-                // 更新内容区
-                const body = document.getElementById('bilibili-study-settings-body');
-                if (body) {
-                    const config = ConfigManager.get();
-                    body.innerHTML = renderSettingsContent(activeSettingsTab, config);
-                    bindSettingsTabEvents();
-                }
-            });
-        });
-
-        // 保存按钮
-        const saveBtn = document.getElementById('bilibili-study-settings-save');
-        if (saveBtn) saveBtn.addEventListener('click', saveSettings);
-
-        // 各 tab 内的事件
-        bindSettingsTabEvents();
-    }
-
-    function bindSettingsTabEvents() {
-        // === 学习时段 tab ===
-        // 删除时段
-        document.querySelectorAll('.bilibili-study-settings-period-item .bilibili-study-settings-remove-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const idx = parseInt(this.dataset.index);
-                this.closest('.bilibili-study-settings-period-item').remove();
-                // 重新编号
-                document.querySelectorAll('.bilibili-study-settings-period-item').forEach((item, i) => {
-                    item.dataset.index = i;
-                    item.querySelectorAll('input').forEach(inp => inp.dataset.index = i);
-                    item.querySelector('.bilibili-study-settings-remove-btn').dataset.index = i;
-                });
-            });
-        });
-
-        // 添加时段
-        const addPeriodBtn = document.getElementById('bilibili-study-add-period');
-        if (addPeriodBtn) {
-            addPeriodBtn.addEventListener('click', function() {
-                const list = document.getElementById('bilibili-study-periods-list');
-                if (!list) return;
-                const idx = list.querySelectorAll('.bilibili-study-settings-period-item').length;
-                const div = document.createElement('div');
-                div.className = 'bilibili-study-settings-period-item';
-                div.dataset.index = idx;
-                div.innerHTML = `
-                    <input type="time" class="bilibili-study-period-start" value="08:00" data-index="${idx}">
-                    <span class="bilibili-study-settings-period-arrow">→</span>
-                    <input type="time" class="bilibili-study-period-end" value="12:00" data-index="${idx}">
-                    <button class="bilibili-study-settings-remove-btn" data-index="${idx}" title="删除此时段">✕</button>
-                `;
-                list.appendChild(div);
-                // 绑定删除事件
-                div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
-                    div.remove();
-                });
-            });
-        }
-
-        // v1.2.4: === 干预设置 tab ===
-        // resetStrategy 联动显示/隐藏参数输入框
-        settingsElement?.querySelectorAll('input[name="resetStrategy"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                const durationRow = document.getElementById('bilibili-study-reset-duration-row');
-                const intervalRow = document.getElementById('bilibili-study-reset-interval-row');
-                if (durationRow) durationRow.style.display = this.value === 'duration' ? 'flex' : 'none';
-                if (intervalRow) intervalRow.style.display = this.value === 'interval' ? 'flex' : 'none';
-            });
-        });
-
-        // 干预等级切换时更新描述和时间表
-        settingsElement?.querySelectorAll('input[name="interventionLevel"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                // 重新渲染干预设置面板以更新描述
-                const body = document.getElementById('bilibili-study-settings-body');
-                if (body) {
-                    const config = ConfigManager.get();
-                    // 临时更新选择的等级
-                    config.interventionLevel = this.value;
-                    body.innerHTML = renderSettingsContent('intervention', config);
-                    bindSettingsTabEvents();
-                }
-            });
-        });
-
-        // 视觉效果切换时更新描述
-        settingsElement?.querySelectorAll('input[name="visualEffectLevel"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                const body = document.getElementById('bilibili-study-settings-body');
-                if (body) {
-                    const config = ConfigManager.get();
-                    config.visualEffectLevel = this.value;
-                    body.innerHTML = renderSettingsContent('intervention', config);
-                    bindSettingsTabEvents();
-                }
-            });
-        });
-
-        // === 白名单 tab ===
-        // 删除白名单项
-        document.querySelectorAll('.bilibili-study-settings-whitelist-item .bilibili-study-settings-remove-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                this.closest('.bilibili-study-settings-whitelist-item').remove();
-            });
-        });
-
-        // 添加白名单
-        const addWhitelistBtn = document.getElementById('bilibili-study-add-whitelist-btn');
-        if (addWhitelistBtn) {
-            addWhitelistBtn.addEventListener('click', function() {
-                const bvInput = document.getElementById('bilibili-study-new-bv');
-                const nameInput = document.getElementById('bilibili-study-new-name');
-                const errorDiv = document.getElementById('bilibili-study-whitelist-error');
-                const bv = (bvInput.value || '').trim();
-                const name = (nameInput.value || '').trim();
-
-                // 验证
-                if (!bv) {
-                    if (errorDiv) errorDiv.textContent = '请输入BV号';
-                    return;
-                }
-                if (!/^BV[\w]+$/i.test(bv)) {
-                    if (errorDiv) errorDiv.textContent = 'BV号格式不正确，应以 BV 开头';
-                    return;
-                }
-                // 检查重复
-                const existing = document.querySelectorAll('.bilibili-study-settings-whitelist-item');
-                for (const item of existing) {
-                    if (item.dataset.bv === bv) {
-                        if (errorDiv) errorDiv.textContent = '该BV号已在白名单中';
-                        return;
-                    }
-                }
-
-                if (errorDiv) errorDiv.textContent = '';
-
-                // 添加到列表
-                const list = document.getElementById('bilibili-study-whitelist-list');
-                if (list) {
-                    const div = document.createElement('div');
-                    div.className = 'bilibili-study-settings-whitelist-item';
-                    div.dataset.bv = bv;
-                    div.innerHTML = `
-                        <div class="bilibili-study-settings-whitelist-info">
-                            <div class="bilibili-study-settings-whitelist-name">${name || bv}</div>
-                            <div class="bilibili-study-settings-whitelist-bv">${bv}</div>
-                        </div>
-                        <button class="bilibili-study-settings-remove-btn" data-bv="${bv}" title="移除此视频">✕</button>
-                    `;
-                    list.appendChild(div);
-                    div.querySelector('.bilibili-study-settings-remove-btn').addEventListener('click', function() {
-                        div.remove();
-                    });
-                    bvInput.value = '';
-                    nameInput.value = '';
-                }
-            });
-        }
-
-        // === 词库 tab ===
-        const vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
-        if (vocabTextarea) {
-            // 实时预览词数
-            vocabTextarea.addEventListener('input', function() {
-                const lines = this.value.split('\n').filter(l => l.trim());
-                const validLines = lines.filter(l => /^.+:.+$/.test(l.trim()));
-                const invalidCount = lines.length - validLines.length;
-                const previewDiv = document.getElementById('bilibili-study-vocab-preview');
-                if (previewDiv) {
-                    if (invalidCount > 0) {
-                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条，<span class="bilibili-study-vocab-error-count">${invalidCount} 行格式错误</span>（需使用 "中文:英文" 格式）`;
-                    } else {
-                        previewDiv.innerHTML = `解析到 <strong>${validLines.length}</strong> 个有效词条`;
-                    }
-                }
-            });
-            // 触发一次预览
-            vocabTextarea.dispatchEvent(new Event('input'));
-        }
-    }
-
-    function saveSettings() {
-        const errors = [];
-        let hasChanges = false;
-
-        // === 保存学习时段 ===（只保存当前激活的 tab）
-        if (activeSettingsTab === 'periods') {
-            const periodItems = settingsElement?.querySelectorAll('.bilibili-study-settings-period-item');
-            if (periodItems) {
-                const newPeriods = [];
-                periodItems.forEach(item => {
-                    const start = item.querySelector('.bilibili-study-period-start')?.value;
-                    const end = item.querySelector('.bilibili-study-period-end')?.value;
-                    if (start && end) {
-                        newPeriods.push([start, end]);
-                    } else if (start || end) {
-                        errors.push('存在不完整的学习时段（缺少开始或结束时间）');
-                    }
-                });
-                const oldPeriods = ConfigManager.get().studyPeriods || [];
-                if (JSON.stringify(newPeriods) !== JSON.stringify(oldPeriods)) {
-                    ConfigManager.save({ studyPeriods: newPeriods });
-                    hasChanges = true;
-                }
-            }
-        }
-
-        // === 保存白名单 ===
-        if (activeSettingsTab === 'whitelist') {
-            const whitelistItems = settingsElement?.querySelectorAll('.bilibili-study-settings-whitelist-item');
-            if (whitelistItems && whitelistItems.length > 0) {
-                const newWhitelist = {};
-                whitelistItems.forEach(item => {
-                    const bv = item.dataset.bv;
-                    const nameEl = item.querySelector('.bilibili-study-settings-whitelist-name');
-                    const name = nameEl ? nameEl.textContent : bv;
-                    if (bv) {
-                        newWhitelist[bv] = { name, addedAt: Date.now() };
-                    }
-                });
-                const oldWhitelist = ConfigManager.get().whitelist || {};
-                if (JSON.stringify(newWhitelist) !== JSON.stringify(oldWhitelist)) {
-                    ConfigManager.save({ whitelist: newWhitelist });
-                    hasChanges = true;
-                }
-            } else if (whitelistItems && whitelistItems.length === 0) {
-                // 用户主动清空了所有白名单
-                const oldWhitelist = ConfigManager.get().whitelist || {};
-                if (Object.keys(oldWhitelist).length > 0) {
-                    ConfigManager.save({ whitelist: {} });
-                    hasChanges = true;
-                }
-            }
-        }
-
-        // === 保存词库 ===
-        if (activeSettingsTab === 'vocab') {
-            const vocabTextarea = document.getElementById('bilibili-study-vocab-textarea');
-            if (vocabTextarea) {
-                const lines = vocabTextarea.value.split('\n').filter(l => l.trim());
-                const newVocab = [];
-                const invalidLines = [];
-
-                lines.forEach((line, i) => {
-                    const trimmed = line.trim();
-                    if (/^.+:.+$/.test(trimmed)) {
-                        const [chinese, ...rest] = trimmed.split(':');
-                        const english = rest.join(':').trim(); // 支持英文中包含冒号
-                        if (chinese.trim() && english) {
-                            newVocab.push(`${chinese.trim()}:${english.trim().toLowerCase()}`);
-                        }
-                    } else if (trimmed) {
-                        invalidLines.push(i + 1);
-                    }
-                });
-
-                if (invalidLines.length > 0) {
-                    errors.push(`词库第 ${invalidLines.slice(0, 5).join(', ')}${invalidLines.length > 5 ? '...' : ''} 行格式错误，需使用 "中文:英文" 格式`);
-                }
-
-                const oldVocab = ConfigManager.get().vocabulary || [];
-                if (newVocab.length > 0 && JSON.stringify(newVocab) !== JSON.stringify(oldVocab)) {
-                    ConfigManager.save({ vocabulary: newVocab });
-                    hasChanges = true;
-                } else if (newVocab.length === 0 && oldVocab.length > 0) {
-                    errors.push('词库不能为空，至少需要1个词条');
-                }
-            }
-        }
-
-        // v1.2.4: === 保存干预设置 ===
-        if (activeSettingsTab === 'intervention') {
-            const levelRadio = settingsElement?.querySelector('input[name="interventionLevel"]:checked');
-            const visualRadio = settingsElement?.querySelector('input[name="visualEffectLevel"]:checked');
-            const strategyRadio = settingsElement?.querySelector('input[name="resetStrategy"]:checked');
-            const autoNavRadio = settingsElement?.querySelector('input[name="autoNavigate"]:checked');
-
-            const newLevel = levelRadio ? levelRadio.value : null;
-            const newVisual = visualRadio ? visualRadio.value : null;
-            const newStrategy = strategyRadio ? strategyRadio.value : null;
-
-            const config = ConfigManager.get();
-
-            if (newLevel && newLevel !== config.interventionLevel) {
-                ConfigManager.save({ interventionLevel: newLevel });
-                hasChanges = true;
-            }
-            if (newVisual && newVisual !== config.visualEffectLevel) {
-                ConfigManager.save({ visualEffectLevel: newVisual });
-                hasChanges = true;
-            }
-            if (newStrategy && newStrategy !== config.resetStrategy) {
-                ConfigManager.save({ resetStrategy: newStrategy });
-                hasChanges = true;
-            }
-
-            // 保存固定时长/间隔参数
-            const durationInput = document.getElementById('bilibili-study-reset-duration');
-            const intervalInput = document.getElementById('bilibili-study-reset-interval');
-            if (durationInput) {
-                const dur = parseInt(durationInput.value) || 30;
-                if (dur !== config.resetDuration) {
-                    ConfigManager.save({ resetDuration: Math.max(5, Math.min(120, dur)) });
-                    hasChanges = true;
-                }
-            }
-            if (intervalInput) {
-                const intv = parseInt(intervalInput.value) || 30;
-                if (intv !== config.resetInterval) {
-                    ConfigManager.save({ resetInterval: Math.max(5, Math.min(120, intv)) });
-                    hasChanges = true;
-                }
-            }
-
-            // v1.3.0: 保存自动导航设置
-            if (autoNavRadio) {
-                const newAutoNav = autoNavRadio.value === 'true';
-                if (newAutoNav !== config.autoNavigate) {
-                    ConfigManager.save({ autoNavigate: newAutoNav });
-                    hasChanges = true;
-                }
-            }
-        }
-
-        // 反馈
-        if (errors.length > 0) {
-            showSettingsToast(errors[0], 'error');
-            return;
-        }
-
-        closeSettings();
-
-        if (hasChanges) {
-            // v1.4.1
-            DebugTelemetry.incrementMetric('settingsChanges');
-            showSettingsToast('✅ 配置已保存，正在刷新面板…', 'success');
-            // 刷新详情面板
-            setTimeout(() => {
-                close(); // 关闭当前详情面板
-                setTimeout(() => open(), 200); // 重新打开以加载新配置
-            }, 800);
-        } else {
-            showSettingsToast('配置无变化', 'success');
-        }
-    }
-
-    // 设置面板的 Toast 反馈
-    function showSettingsToast(message, type) {
-        const existing = document.querySelector('.bilibili-study-settings-toast');
-        if (existing) existing.remove();
-
-        const toast = document.createElement('div');
-        toast.className = `bilibili-study-settings-toast bilibili-study-settings-toast-${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        requestAnimationFrame(() => {
-            toast.classList.add('show');
-        });
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
+    // SettingsPanel 已拆分为独立模块，通过 _injectAPI 注入依赖
+    SettingsPanel._injectAPI({
+        close: close,
+        open: open,
+        getCurrentTheme: function() { return currentTheme; }
+    });
 
     return {
         open,
@@ -6941,7 +6977,7 @@ const DetailPanel = (function() {
         getCurrentTheme: function() { return currentTheme; },
         detectTheme: detectBilibiliTheme,
         loadTheme: loadTheme,
-        openSettings
+        openSettings: SettingsPanel.openSettings
     };
 })();
 
