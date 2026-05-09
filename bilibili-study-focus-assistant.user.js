@@ -4169,6 +4169,21 @@ const DebugTelemetry = (function() {
     function logError(event, data) { return log(CATEGORY.ERROR, event, data); }
     function logUserAction(event, data) { return log(CATEGORY.USER_ACTION, event, data); }
 
+    // P1-8: 统一错误上报
+    function reportError(error, context) {
+        context = context || {};
+        var msg = error instanceof Error ? error.message : String(error);
+        var entry = log(CATEGORY.ERROR, [context.module, context.operation].filter(Boolean).join('.') || 'unknown', {
+            message: msg,
+            stack: error instanceof Error ? error.stack : undefined,
+            module: context.module || '',
+            operation: context.operation || '',
+            data: context.data || null
+        });
+        console.warn('[B站学习助手] ' + (context.module || '?') + '.' + (context.operation || '?') + ' 失败:', msg);
+        return entry;
+    }
+
     // ── 全局挂载 ──
     // 挂载到 unsafeWindow 方便控制台调试
     try {
@@ -4189,7 +4204,9 @@ const DebugTelemetry = (function() {
                 resetMetrics: resetMetrics
             };
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+        reportError(e, { module: 'DebugTelemetry', operation: 'mountGlobals' });
+    }
 
     return {
         log: log,
@@ -4199,6 +4216,7 @@ const DebugTelemetry = (function() {
         logTiming: logTiming,
         logError: logError,
         logUserAction: logUserAction,
+        reportError: reportError,
         captureSnapshot: captureSnapshot,
         query: query,
         dumpMultiWindowTrace: dumpMultiWindowTrace,
