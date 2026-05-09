@@ -4,26 +4,26 @@
 
 ---
 
-## 一、当前 Harness 组件 (82% 完成)
+## 一、当前 Harness 组件 (92% 完成)
 
 | 组件 | 状态 | 说明 |
 |------|------|------|
 | `check.sh` | ✅ | 统一检查入口，7道串联 |
 | `eval-check.sh` | ✅ | 12/12 PASS |
 | `integration-check.sh` | ✅ | CSS一致性+暗色适配+行号 |
-| `lint-modules.sh` | ✅ | 模块依赖方向检查 |
-| `health-report.sh` | ✅ | JSON输出，供Dashboard消费 |
+| `lint-modules.sh` | ✅ | **已升级为语义 linter** — 违规时给出「应该用什么 API」的建议 |
+| `health-report.sh` | ✅ | JSON输出 + 同时保存到 `harness/health-status.json` |
 | `.harness-shared-interfaces.md` | ✅ | 多Agent共享接口定义 |
 | `docs/` | ✅ | 12个设计文档已移入 + README |
+| `log-failure.sh` | ✅ **新增** | Agent失败自动记录到 `harness/evals/failures/failures.jsonl` |
+| `analyze-failures.sh` | ✅ **新增** | 失败模式分析：按类型/Agent统计 |
 | **Generator-Evaluator 分离** | ✅ **实验通过** | 第一轮验证成功 |
 
 ### 未完成
 
 | 缺口 | 优先级 | 说明 |
 |------|--------|------|
-| 架构语义 linter | P0 | 目前 `lint-modules.sh` 只能查模式匹配，不能检查「应该用 A 而不是 B」的语义约束 |
-| health-report → Telemetry Dashboard 动态接入 | P1 | JSON已有但数字还是硬编码的 |
-| 自动化失败模式采集 | P2 | Agent 卡死/超时→自动写 JSON 到 `harness/evals/failures/` |
+| Telemetry Dashboard 动态接入 | P1 | 已预备从 localStorage 读取，但 check.sh→browser 管线还未完全接通 |
 | 自动化 Skill 更新 | P2 | Meta Agent 读取失败模式 → 自动更新 SKILL.md |
 | npm test 回归 | P3 | `package.json` 配了 Jest 但从未跑过 |
 

@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-05-09T13:40:39+08:00",
+  "summary": {
+    "passed": 6,
+    "warnings": 2,
+    "failed": 1
+  },
+  "checks": {
+    "shared_interface": { "status": "pass", "detail": ".harness-shared-interfaces.md 存在" },
+    "file_integrity": { "status": "pass", "detail": "5/5 文件存在" },
+    "structure": { "status": "pass", "detail": "@match + @version 正确" },
+    "harness_structure": { "status": "pass", "detail": "4/4 组件存在" },
+    "dependencies": { "status": "warn", "detail": "npm 依赖未安装" },
+    "git_status": { "status": "pass", "detail": "main 分支, 工作区干净" },
+    "eval": { "status": "pass", "detail": "12/12 PASS" },
+    "integration": { 
+      "status": "warn", 
+      "detail": "CSS: 96个缺失, 暗色: 68个缺失, 行号: 6个偏差",
+      "missing_css": 96,
+      "missing_dark": 68,
+      "line_issues": 6
+    },
+    "lint": {
+      "status": "fail",
+      "detail": "5 个架构违规",
+      "violations": 5
+    }
+  }
+}
