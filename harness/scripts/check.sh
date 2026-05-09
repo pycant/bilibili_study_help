@@ -113,7 +113,18 @@ else
     echo "⚠️  不是 Git 仓库"
 fi
 
-# 6. 检查 eval cases
+# 6. 模块依赖方向检查（如果存在）
+echo ""
+echo "[模块依赖方向检查]"
+if [ -f "harness/scripts/lint-modules.sh" ]; then
+    echo "↳ 运行 lint 检查..."
+    bash harness/scripts/lint-modules.sh || true
+else
+    echo "⚠️  模块 lint 脚本未安装"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# 7. 检查 eval cases
 echo ""
 echo "[Eval 集检查]"
 EVAL_COUNT=$(ls -1 harness/evals/cases/ 2>/dev/null | wc -l)
