@@ -12,6 +12,15 @@ echo "====================="
 ERRORS=0
 WARNINGS=0
 
+# 0. 共享接口文件检查
+echo ""
+echo "[共享接口检查]"
+if [ -f ".harness-shared-interfaces.md" ]; then
+    echo "✅ 共享接口定义: .harness-shared-interfaces.md"
+else
+    echo "⚠️  共享接口文件缺失（仅多Agent并行时需要）"
+fi
+
 # 1. 核心文件存在性检查
 check_file() {
     local file="$1"
@@ -112,6 +121,29 @@ if [ "$EVAL_COUNT" -gt 0 ]; then
     echo "✅ 评估用例数: $EVAL_COUNT"
 else
     echo "⚠️  评估用例为空"
+fi
+
+# 7. 集成验证检查（如果存在）
+echo ""
+echo "[集成验证检查]"
+if [ -f "harness/scripts/integration-check.sh" ]; then
+    echo "↳ 运行集成检查..."
+    # 运行但不阻断主流程
+    bash harness/scripts/integration-check.sh || true
+else
+    echo "⚠️  集成验证脚本未安装"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# 8. Eval 自动检查（如果存在）
+echo ""
+echo "[Eval 自动检查]"
+if [ -f "harness/scripts/eval-check.sh" ]; then
+    echo "↳ 运行 Eval 检查..."
+    bash harness/scripts/eval-check.sh || true
+else
+    echo "⚠️  Eval 自动检查脚本未安装"
+    WARNINGS=$((WARNINGS + 1))
 fi
 
 # 总结

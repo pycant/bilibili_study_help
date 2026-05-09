@@ -36,8 +36,23 @@ f:\all_proj\study_help_web_app\
 ## 标准命令
 - **环境初始化**: `bash harness/scripts/init.sh`
 - **运行检查**: `bash harness/scripts/check.sh`
+- **集成验证**: `bash harness/scripts/integration-check.sh`
+- **Eval 自动检查**: `bash harness/scripts/eval-check.sh`
 - **运行测试**: `npm test`（需先 `npm install`）
 - **本地提交**: `git add -A && git commit -m "vX.Y.Z: 改动说明"`
+
+## 重要：多 Agent 并行开发时必须读的文件
+| 文件 | 用途 |
+|------|------|
+| `.harness-shared-interfaces.md` | **所有 Agent 开工前必须读**。定义 CSS class 命名空间、API 签名、模块边界 |
+| `AGENTS.md`（本文件） | 项目简报：技术栈、结构、模块行号 |
+| `.workbuddy/skills/bilibili-dev-conventions/SKILL.md` | 项目级编码规范 Skill |
+
+> **并行开发前 Orchestrator 必须做的事**：
+> 1. 确认 `.harness-shared-interfaces.md` 已更新到最新
+> 2. 创建独立分支：`feat/agent-a`, `feat/agent-b`, ...
+> 3. 每个 Agent 的提示词开头写：先读 `.harness-shared-interfaces.md` + 加载 bilibili-dev-conventions Skill
+> 4. 合并后跑集成验证：`bash harness/scripts/integration-check.sh`
 
 ## 核心架构（IIFE 模块化）
 | 模块 | 行号范围 | 职责 |
@@ -67,10 +82,13 @@ f:\all_proj\study_help_web_app\
 - 版本号格式：`vX.Y.Z`（主版本.次版本.补丁），小修复用 `vX.Y.Z.Z`
 
 ## 当前版本
-v1.3.0 — P0 自动导航 + P2 三级阻拦 + Stage动态化（见 CHANGELOG.md）
+v1.4.1 — Telemetry Dashboard 浮动窗 + 11指标 + 用户操作追踪（见 CHANGELOG.md）
 
 ## 后续路线
-- ✅ v1.2.6.3+：多窗口引导弹窗重复 / toast 逻辑异常修复（已合入 v1.2.6.2）
-- ✅ v1.2.7：BroadcastChannel + 多窗口实时状态同步 + BV号记忆
-- ✅ v1.3.0：P0 自动跳转 + P2 三级干预整合
-- v1.3.1+：待定
+- ✅ v1.2.6.2：DebugTelemetry + 多窗口瞬态修复
+- ✅ v1.2.7：BroadcastChannel + 多窗口同步 + BV记忆
+- ✅ v1.3.0：P0自动导航 + P2三级阻拦 + Stage动态化
+- ✅ v1.3.1：内联样式修复 + 暗色适配补全
+- ✅ v1.4.0：Telemetry Dashboard（Logs/Metrics/Traces）
+- ✅ v1.4.1：浮动窗重构 + 用户操作追踪
+- 🔲 下一轮：Eval自动化 + 集成验证 + Harness升级
