@@ -5959,21 +5959,14 @@ const DetailPanel = (function() {
         }
     }
 
-    // Open modal
-    function open() {
-        if (isOpen) {
-            close(); // Close existing modal first
-        }
+    // Render all status sections into one HTML string
+    function renderStatusSections() {
+        return renderModule1() + renderModule2() + renderModule3() + renderModule4() + renderModule5() + renderModule6();
+    }
 
-        // Create modal overlay
-        modalElement = document.createElement('div');
-        modalElement.id = MODAL_ID;
-        modalElement.className = 'bilibili-study-modal-overlay';
-        
-        // Load saved theme
-        loadTheme();
-        
-        modalElement.innerHTML = `
+    // Create the modal panel HTML
+    function createPanelContent(theme) {
+        return `
             <div class="bilibili-study-modal">
                 <div class="bilibili-study-modal-header">
                     <h2>学习专注助手 - 详细统计</h2>
@@ -5994,21 +5987,33 @@ const DetailPanel = (function() {
                                 id="bilibili-study-theme-toggle"
                                 style="padding: 6px 12px; font-size: 18px; cursor: pointer;"
                                 title="切换主题">
-                            ${currentTheme === 'dark' ? '☀️' : '🌙'}
+                            ${theme === 'dark' ? '☀️' : '🌙'}
                         </button>
                         <button class="bilibili-study-modal-close" id="bilibili-study-modal-close">&times;</button>
                     </div>
                 </div>
                 <div class="bilibili-study-modal-body">
-                    ${renderModule1()}
-                    ${renderModule2()}
-                    ${renderModule3()}
-                    ${renderModule4()}
-                    ${renderModule5()}
-                    ${renderModule6()}
+                    ${renderStatusSections()}
                 </div>
             </div>
         `;
+    }
+
+    // Open modal
+    function open() {
+        if (isOpen) {
+            close(); // Close existing modal first
+        }
+
+        // Create modal overlay
+        modalElement = document.createElement('div');
+        modalElement.id = MODAL_ID;
+        modalElement.className = 'bilibili-study-modal-overlay';
+        
+        // Load saved theme
+        loadTheme();
+        
+        modalElement.innerHTML = createPanelContent(currentTheme);
 
         document.body.appendChild(modalElement);
         isOpen = true;
