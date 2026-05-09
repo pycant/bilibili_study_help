@@ -5197,12 +5197,22 @@ const TelemetryUI = (function() {
             html += '<div class="bilibili-study-telemetry-float-empty">无其他活跃窗口</div>';
         }
 
-        // Harness 健康
+        // Harness 健康（尝试从 localStorage 读取，无数据则显示等待状态）
+        var hrPassed = '?', hrWarn = '?', hrFail = '?';
+        try {
+            var hrData = localStorage.getItem('bilibiliStudy_healthReport');
+            if (hrData) {
+                var hrParsed = JSON.parse(hrData);
+                hrPassed = hrParsed.summary.passed;
+                hrWarn = hrParsed.summary.warnings;
+                hrFail = hrParsed.summary.failed;
+            }
+        } catch (e) { /* 读取失败，用默认值 */ }
         html += '<div class="bilibili-study-telemetry-float-section-title">🔬 Harness 健康</div>';
         html += '<div class="bilibili-study-telemetry-float-metrics-grid" style="grid-template-columns:1fr 1fr 1fr;">';
-        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">通过</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#22c55e">6</span></div>';
-        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">警告</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#f59e0b">2</span></div>';
-        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">失败</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#ef4444">1</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">通过</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#22c55e">' + hrPassed + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">警告</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#f59e0b">' + hrWarn + '</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">失败</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#ef4444">' + hrFail + '</span></div>';
         html += '</div>';
 
         // 操作按钮

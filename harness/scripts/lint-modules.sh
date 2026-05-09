@@ -69,6 +69,13 @@ check_rule() {
         # 只在模块定义范围内检查（from_line 到 from_end 之间）
         if [ "$line_num" -gt "$from_line" ] 2>/dev/null && [ "$line_num" -lt "$from_end" ] 2>/dev/null; then
             echo "❌ $from_name 内部引用 $to_name（$pattern 在 $line_num 行）"
+            if [ "$pattern" = "__bilibiliStudyAppState" ]; then
+                echo "   建议: 应通过 GlobalStateManager.syncFromAppState() 或 GlobalStateManager.get() 访问，而非直接读写 window.__bilibiliStudyAppState"
+            elif [ "$pattern" = "TabManager\.isMaster" ] || [ "$pattern" = "TabManager\.TAB_ID" ]; then
+                echo "   建议: 应通过 TabManager.isMaster() 函数调用而非直接访问内部变量"
+            elif [ "$pattern" = "TabManager\.getRegistry" ]; then
+                echo "   建议: 应通过 TabManager.getRegistry() 公开 API 访问注册表"
+            fi
             ERRORS=$((ERRORS + 1))
         fi
     done <<< "$hit_lines"
@@ -83,12 +90,32 @@ check_rule "WordVerifier" "GlobalStateManager" "__bilibiliStudyAppState"
 check_rule "DetailPanel" "TabManager" "TabManager\.isMaster"
 check_rule "DetailPanel" "TabManager" "TabManager\.TAB_ID"
 check_rule "InterventionController" "TabManager" "TabManager\.isMaster"
+check_rule "InterventionController" "TabManager" "TabManager\.getRegistry"
+
+# 检查：后定义模块不应直接读 localStorage 的 bilibiliStudy 键（应由 StorageManager 代理）
+echo ""
+echo "[API 使用规范检查]"
+echo "规则：模块应通过公开 API 访问数据，而非直接操作 localStorage"
+
+# 检查 DetailPanel 是否直接读 localStorage
+detail_start=$(grep -n "^function open\|DetailPanel\.open" "$SCRIPT" | head -1 | cut -d: -f1)
+ls_lines=$(grep -n "localStorage.getItem('bilibiliStudy" "$SCRIPT" 2>/dev/null || true)
+while IFS=: read -r line content; do
+    [ -z "$line" ] && continue
+    if [ -n "$detail_start" ] && [ "$line" -gt "$detail_start" ] 2>/dev/null; then
+        echo "❌ DetailPanel 直接读 localStorage（$line 行）"
+        echo "   建议: 应通过 StorageManager 或 ConfigManager 的公开 API 访问"
+        ERRORS=$((ERRORS + 1))
+    fi
+done <<< "$ls_lines"
 
 # 总结
 echo ""
 echo "====================="
 if [ "$ERRORS" -gt 0 ]; then
-    echo "❌ $ERRORS 个依赖方向违规"
+    echo "❌ $ERRORS 个语义违规"
+    echo "   运行以下命令查看违规详情："
+    echo "   grep -n '__bilibiliStudyAppState\|localStorage\.getItem.*bilibili' $SCRIPT | head -20"
     exit 1
 else
     echo "✅ 依赖方向检查通过"
