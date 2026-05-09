@@ -7834,7 +7834,8 @@ const InterventionController = (function() {
     function showAggressiveIntervention() {
         if (document.getElementById('bilibili-study-aggressive-overlay')) return;
 
-        const state = window.__bilibiliStudyAppState;
+        // v1.4.2
+        const state = window.__bilibiliStudyAppState; // 读取可接受，lint:可豁免
         const distractionElapsed = state && state.distractionStartTime
             ? Math.floor((Date.now() - state.distractionStartTime) / 1000)
             : 0;
@@ -8044,9 +8045,13 @@ const InterventionController = (function() {
             closeCurrentModal();
             StatisticsTracker.incrementDistractionCount();
             if (window.__bilibiliStudyAppState) {
+                // v1.4.2
                 window.__bilibiliStudyAppState.distractionStartTime = Date.now();
+                // v1.4.2
                 window.__bilibiliStudyAppState.currentStage = 1;
             }
+            // v1.4.2 修改全局状态后同步到 localStorage
+            GlobalStateManager.syncFromAppState();
             // Start the popup timer from this point
             lastPopupTime = Date.now();
             // v1.3.0 P0: 触发自动导航倒计时
