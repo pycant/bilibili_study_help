@@ -36,12 +36,19 @@
 
 ### P1 — 设计债（模块过大）
 
-| # | 模块 | 行数 | 描述 | 影响 |
+| # | 模块 | 行数 | 描述 | 状态 |
 |---|------|------|------|------|
-| 1 | `DetailPanel` | ~1531 | 面板渲染+事件绑定+主题+词汇=4职责揉一起 | 修改其中一个功能可能影响其他三个 |
-| 2 | `InterventionController` | ~1209 | 弹窗+视觉干预+计时+单词验证揉一起 | 代码量最大的模块，变更风险高 |
-| 3 | `TabManager` | ~1080 | Master选举+心跳+多窗口检测+引导弹窗揉一起 | 多窗口逻辑与引导弹窗耦合 |
-| 4-9 | 各处 | — | 重复函数`formatTime`、42个try-catch吞异常、硬编码魔法数字 | 见 `harness/tasks/tech-debt.md` P1-4~9 |
+| 1 | `DetailPanel` | ~1531 | 面板渲染+事件绑定+主题+词汇=4职责揉一起 | ❌ |
+| 2 | `InterventionController` | ~1209 | 弹窗+视觉干预+计时+单词验证揉一起 | ❌ |
+| 3 | `TabManager` | ~1080 | Master选举+心跳+多窗口检测+引导弹窗揉一起 | ❌ |
+| 4 | `saveSettings` | 164行函数 | HTML生成已抽离为纯函数 | ✅ 已完成 |
+| 5 | `open` | 169行函数 | 拆分为createPanelContent+renderStatusSections | ✅ 已完成 |
+| 6 | `showConfirmModal` | 166行函数 | 渲染已抽离为renderConfirmModalHTML | ✅ 已完成 |
+| 7 | `formatTime` | — | 两模块重复定义，已统一 | ✅ 已完成 |
+| 8 | 全局 | 46个try-catch | 统一错误处理 | ❌ |
+| 9 | `interventionStages` | — | 配置重叠，已移除 | ✅ 已完成 |
+
+> 完整状态追踪见 `harness/tasks/tech-debt.md`（每项带完成日期）
 
 ### P2 — 代码债
 

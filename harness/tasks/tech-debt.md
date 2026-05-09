@@ -24,17 +24,17 @@
 
 ## P1 - 设计债
 
-| # | 位置 | 描述 | 建议 |
-|---|------|------|------|
-| 1 | `DetailPanel` (5362-6893) | 单模块 1532 行，承担面板渲染、事件绑定、主题管理、词汇学习界面等多重职责 | 按职责拆分为 PanelRenderer / VocabPanel / SettingsPanel 子模块 |
-| 2 | `InterventionController` (7377-8585) | 单模块 1209 行，包含弹窗管理、视觉干预、计时逻辑、单词验证流水线 | 拆分出 ModalRenderer / ProgressiveTimer 独立模块 |
-| 3 | `TabManager` (2820-3899) | 单模块 1080 行，包含 Master选举、心跳、多窗口检测、引导弹窗 | 分离 MasterElection / HeartbeatManager / GuideModal 子模块 |
-| 4 | `saveSettings()` 第 6707 行 | 函数体 164 行，嵌套 HTML 模板+遍历逻辑，可读性差 | 将 HTML 生成抽离为纯函数，设定值拼接统一管理 |
-| 5 | `open()` 第 5972 行 | 函数体 169 行，包含大量 DOM 创建+事件绑定+条件分支 | 拆分为 createPanelContent / bindPanelEvents / renderStatusSections |
-| 6 | `showConfirmModal()` 第 7939 行 | 函数体 166 行，HTML 模板+事件绑定+样式混合 | 提取为独立渲染函数，减少行内 HTML 字面量 |
-| 7 | `formatTime()` (4603, 5444) | `FloatingWindow` 和 `DetailPanel` 中各定义一次相同的 `formatTime(seconds)` | 提取到共享模块或全局 util 对象 |
-| 8 | 全局 | 42 个 try-catch 块，大量用 `console.error` 静默吞异常，无结构化错误上报 | 统一错误处理函数，区分可恢复/不可恢复错误并上报到 DebugTelemetry |
-| 9 | `USER_CONFIG.interventionStages` 第 4395 行 | 硬编码的干预阶段配置（threshold/interval 数组），与 `getInterventionProfile` 中的 gentle/standard/strict 配置语义重叠 | 移除 `USER_CONFIG.interventionStages`，统一用 `getInterventionProfile` 配置体系 |
+| # | 位置 | 描述 | 建议 | 状态 |
+|---|------|------|------|------|
+| 1 | `DetailPanel` (5362-6893) | 单模块 1532 行，承担面板渲染、事件绑定、主题管理、词汇学习界面等多重职责 | 按职责拆分为 PanelRenderer / VocabPanel / SettingsPanel 子模块 | ❌ 未开始 |
+| 2 | `InterventionController` (7377-8585) | 单模块 1209 行，包含弹窗管理、视觉干预、计时逻辑、单词验证流水线 | 拆分出 ModalRenderer / ProgressiveTimer 独立模块 | ❌ 未开始 |
+| 3 | `TabManager` (2820-3899) | 单模块 1080 行，包含 Master选举、心跳、多窗口检测、引导弹窗 | 分离 MasterElection / HeartbeatManager / GuideModal 子模块 | ❌ 未开始 |
+| 4 | `saveSettings()` 第 6707 行 | 函数体 164 行，嵌套 HTML 模板+遍历逻辑，可读性差 | 将 HTML 生成抽离为纯函数，设定值拼接统一管理 | ✅ 已完成（2026-05-09 前已提前完成） |
+| 5 | `open()` 第 5972 行 | 函数体 169 行，包含大量 DOM 创建+事件绑定+条件分支 | 拆分为 createPanelContent / bindPanelEvents / renderStatusSections | ✅ 已完成（2026-05-09） |
+| 6 | `showConfirmModal()` 第 7939 行 | 函数体 166 行，HTML 模板+事件绑定+样式混合 | 提取为独立渲染函数，减少行内 HTML 字面量 | ✅ 已完成（2026-05-09） |
+| 7 | `formatTime()` (4603, 5444) | `FloatingWindow` 和 `DetailPanel` 中各定义一次相同的 `formatTime(seconds)` | 提取到共享模块或全局 util 对象 | ✅ 已完成（2026-05-09） |
+| 8 | 全局 | 42 个 try-catch 块，大量用 `console.error` 静默吞异常，无结构化错误上报 | 统一错误处理函数，区分可恢复/不可恢复错误并上报到 DebugTelemetry | ❌ 未开始 |
+| 9 | `USER_CONFIG.interventionStages` 第 4395 行 | 硬编码的干预阶段配置（threshold/interval 数组），与 `getInterventionProfile` 中的 gentle/standard/strict 配置语义重叠 | 移除 `USER_CONFIG.interventionStages`，统一用 `getInterventionProfile` 配置体系 | ✅ 已完成（2026-05-09） |
 
 ---
 

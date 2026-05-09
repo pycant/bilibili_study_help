@@ -124,7 +124,18 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# 7. 检查 eval cases
+# 7. 技术债交叉验证
+echo ""
+echo "[技术债一致性检查]"
+if [ -f "harness/scripts/verify-techdebt.sh" ]; then
+    echo "↳ 运行验证..."
+    bash harness/scripts/verify-techdebt.sh || true
+else
+    echo "⚠️  技术债验证脚本未安装"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# 8. 检查 eval cases
 echo ""
 echo "[Eval 集检查]"
 EVAL_COUNT=$(ls -1 harness/evals/cases/ 2>/dev/null | wc -l)
