@@ -57,22 +57,23 @@ f:\all_proj\study_help_web_app\
 ## 核心架构（IIFE 模块化）
 | 模块 | 行号范围 | 职责 |
 |------|----------|------|
-| STYLES | 20–1782 | 全局 CSS |
-| USER_CONFIG | 1787–1959 | 默认配置 |
-| ConfigManager | 1964–2371 | 配置管理 |
-| GlobalStateManager | 2378–2572 | 全局状态持久化 |
-| TabManager | 2579–3649 | 多窗口 Master + BroadcastChannel |
-| DebugTelemetry | 3656–3904 | 可观测性系统 |
-| HistoryVideoTracker | 3911–3993 | 离开视频记录 |
-| StorageManager | 3995–4062 | 存储封装 |
-| PageMonitor | 4131–4244 | URL/BV 监控 |
-| FloatingWindow | 4249–4525 | 悬浮窗 |
-| DetailPanel | 4530–6054 | 统计面板 |
-| WordVerifier | 6059–6250 | 单词验证 |
-| StatisticsTracker | 6255–6391 | 时间统计 |
-| ModalManager | 6397–6533 | 弹窗层级管理 |
-| InterventionController | 6538–7972 | 核心状态机 |
-| Main IIFE | 7977–8096 | 入口/主循环 |
+| STYLES | 20–2016 | 全局 CSS |
+| USER_CONFIG | 2025–2202 | 默认配置 |
+| ConfigManager | 2205–2612 | 配置管理 |
+| GlobalStateManager | 2619–2813 | 全局状态持久化 |
+| TabManager | 2820–3899 | 多窗口 Master + BroadcastChannel |
+| DebugTelemetry | 3906–4222 | 可观测性系统 |
+| HistoryVideoTracker | 4229–4311 | 离开视频记录 |
+| StorageManager | 4313–4380 | 存储封装 |
+| PageMonitor | 4449–4562 | URL/BV 监控 |
+| FloatingWindow | 4567–4843 | 悬浮窗 |
+| TelemetryUI | 4846–5357 | 调试面板 UI |
+| DetailPanel | 5362–6893 | 统计面板 |
+| WordVerifier | 6898–7089 | 单词验证 |
+| StatisticsTracker | 7094–7230 | 时间统计 |
+| ModalManager | 7234–7372 | 弹窗层级管理 |
+| InterventionController | 7377–8585 | 核心状态机 |
+| Main IIFE | 8588–8924 | 入口/主循环 |
 
 ## 关键约定
 - `__bilibiliStudyAppState` 为全局状态对象

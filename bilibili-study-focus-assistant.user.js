@@ -464,11 +464,6 @@ const STYLES = `
         50% { outline-color: #ef4444; }
     }
 
-    /* Dynamic visual effect applied via JS */
-    .bilibili-study-visual-effect {
-        transition: filter 0.5s ease, opacity 0.5s ease;
-    }
-
     /* Dark mode for detail panel */
     .bilibili-study-dark-mode {
         background-color: rgba(0, 0, 0, 0.85) !important;
@@ -1919,11 +1914,6 @@ const STYLES = `
         border-bottom: 2px solid #3b82f6;
         font-weight: 500;
     }
-    .bilibili-study-telemetry-float-body {
-        padding: 12px;
-        max-height: 500px;
-        overflow-y: auto;
-    }
 
     /* Dark mode dla Telemetry Floating Window */
     .bilibili-study-dark-mode .bilibili-study-telemetry-float-window {
@@ -1956,9 +1946,6 @@ const STYLES = `
     .bilibili-study-dark-mode .bilibili-study-telemetry-float-tab.active {
         color: #60a5fa;
         border-bottom-color: #60a5fa;
-    }
-    .bilibili-study-dark-mode .bilibili-study-telemetry-float-body {
-        color: #e0e0e0;
     }
     /* 其他窗口卡片样式（v1.4.1） */
     .bilibili-study-telemetry-float-remote-window {
