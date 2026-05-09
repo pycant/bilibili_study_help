@@ -1,6 +1,6 @@
 # 项目状态速览
 
-> 最后更新：2026-05-09 | 版本：v1.4.1 | 代码行：8936
+> 最后更新：2026-05-09 | 版本：v1.4.1 | 代码行：9082
 
 ---
 
@@ -38,15 +38,11 @@
 
 | # | 模块 | 行数 | 描述 | 状态 |
 |---|------|------|------|------|
-| 1 | `DetailPanel` | ~1531 | 面板渲染+事件绑定+主题+词汇=4职责揉一起 | ❌ |
+| 1 | `DetailPanel` | ~1524→**拆分后** SettingsPanel(542) + PanelRenderer(645) + VocabPanel(~240) | 已拆为3个独立IIFE（Step 1+2完成），VocabPanel待提为独立模块 | 🔄 Step 3 可选 |
 | 2 | `InterventionController` | ~1209 | 弹窗+视觉干预+计时+单词验证揉一起 | ❌ |
 | 3 | `TabManager` | ~1080 | Master选举+心跳+多窗口检测+引导弹窗揉一起 | ❌ |
-| 4 | `saveSettings` | 164行函数 | HTML生成已抽离为纯函数 | ✅ 已完成 |
-| 5 | `open` | 169行函数 | 拆分为createPanelContent+renderStatusSections | ✅ 已完成 |
-| 6 | `showConfirmModal` | 166行函数 | 渲染已抽离为renderConfirmModalHTML | ✅ 已完成 |
-| 7 | `formatTime` | — | 两模块重复定义，已统一 | ✅ 已完成 |
-| 8 | 全局 | 46个try-catch | 统一错误处理 | ❌ |
-| 9 | `interventionStages` | — | 配置重叠，已移除 | ✅ 已完成 |
+| 4-7,9 | 函数提取+配置清理 | — | HTML抽离/open拆分/formatTime去重/showConfirmModal拆分/interventionStages移除 | ✅ 已完成 |
+| 8 | 全局 | 47个try-catch | 统一错误处理 `reportError()`，全部替换，0空catch残留 | ✅ 已完成 |
 
 > 完整状态追踪见 `harness/tasks/tech-debt.md`（每项带完成日期）
 
