@@ -117,7 +117,9 @@
 |---|------|------|------|---------|
 | 1 | **Agent 报告消息不可靠** | Evaluator 的审查报告没能传回来，复盘信息不全 | SendMessage 确认机制缺失 | 在 prompt 中要求 Agent 输出后确认「消息已送达」 |
 | 2 | **Agent 改显示格式前未确认** | formatTime 从 `XhYm` 改为 `HH:MM:SS` 是设计决策变更，Agent 直接做了 | Generator 提示词缺少「行为变更须报告」规则 | 在 `bilibili-dev-conventions` Skill 加入「修改用户可见行为前须报告」 |
-| 3 | **技术债追踪缺少自动完成标记** | P1-4 实际上早已完成但仍在清单中 | tech-debt.md 没有「最近一次验证」时间戳 | `meta-update.sh` 新增功能：对比 STATUS.md 和 tech-debt.md 的一致性 |
+| 3 | **技术债追踪缺少自动完成标记** | P1-4 早已完成但仍在清单 | 无自动交叉比对 | ✅ `verify-techdebt.sh` 已接入 `check.sh` |
+| 4 | **模块拆分漏删旧代码** | PanelRenderer 建了 dupe 没清理 | Agent 任务太大未完成 | ✅ `harness-builder` Skill 新增「模块拆分安全协议」3步+Checklist |
+| 5 | **跨模块引用断裂** | getTodayStats 移动后调用者未更新 | 移动前没 grep 调用者 | ✅ Skill 安全协议 Step 1 要求「依赖扫描先查再动」 |
 | 4 | **长命令超时已修但未回归验证** | awk 超时修了但没验证下次是否还会发生 | 没有写回归 Eval 用例 | 在 eval-check.sh 中加一个「复杂命令不超时」用例 |
 
 ## 七、关键引用文件
