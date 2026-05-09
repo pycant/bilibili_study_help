@@ -2482,8 +2482,9 @@ const ConfigManager = (function() {
     }
 
     // v1.2.4: 根据 interventionLevel 获取实际生效的干预阶段配置
-    // 如果用户自定义过 interventionStages 则优先用自定义的
+    // 如果 localStorage 中存了自定义的 interventionStages 则优先用自定义的
     // v1.3.0: 增加 level 字段
+    // P1-9: interventionStages 已从 USER_CONFIG 移除，仅来自 localStorage 自定义
     function getEffectiveInterventionStages() {
         const config = get();
         // 如果 localStorage 中存了自定义的 interventionStages，优先使用
