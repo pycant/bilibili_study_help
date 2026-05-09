@@ -207,6 +207,9 @@ JSON=$(cat <<JSONEOF
 JSONEOF
 )
 
+# 同时保存到文件（供 Telemetry Dashboard 读取）
+echo "$JSON" > "$SCRIPT_DIR/harness/health-status.json" 2>/dev/null || true
+
 # Format JSON
 if command -v jq &>/dev/null; then
     echo "$JSON" | jq .
