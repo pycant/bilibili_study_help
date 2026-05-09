@@ -42,4 +42,4 @@ out/
 dist/
 
 # ---- Harness 运行时产物（故障自动采集需创建时手动取消忽略） ----
-# harness/evals/failures/
+harness/evals/failures/
