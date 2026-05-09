@@ -7927,29 +7927,21 @@ const InterventionController = (function() {
         console.log('[B站学习助手] showAggressiveIntervention: 显示强拦截遮罩');
     }
 
-    function showConfirmModal() {
-        if (modalState !== MODAL_STATES.NONE) {
-            console.log('[B站学习助手] showConfirmModal: 跳过，当前弹窗状态=', modalState);
-            return;
-        }
-        console.log('[B站学习助手] showConfirmModal: 显示确认弹窗');
-        modalState = MODAL_STATES.CONFIRM;
+    // 渲染确认弹窗 HTML
+    function renderConfirmModalHTML(data) {
+        var whitelist = data.whitelist;
+        var hasWhitelist = data.hasWhitelist;
+        var isDark = data.isDark;
+        var ciBg = isDark ? 'rgba(40,45,55,0.8)' : 'white';
+        var ciBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e0e0e0';
+        var ciText = isDark ? '#999' : '#666';
+        var ctBg = isDark ? 'rgba(30,35,45,0.5)' : '#f8f9fa';
+        var ctLabel = isDark ? '#e0e0e0' : '#333';
 
-        // 获取白名单课程
-        const whitelist = ConfigManager.getWhitelistArray();
-        const hasWhitelist = whitelist && whitelist.length > 0;
-        
-        let courseOptions = '';
+        var courseOptions = '';
         if (hasWhitelist) {
-            const isDark = DetailPanel.getCurrentTheme() === 'dark';
-            const ciBg = isDark ? 'rgba(40,45,55,0.8)' : 'white';
-            const ciBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e0e0e0';
-            const ciText = isDark ? '#999' : '#666';
-            const ctBg = isDark ? 'rgba(30,35,45,0.5)' : '#f8f9fa';
-            const ctLabel = isDark ? '#e0e0e0' : '#333';
-            // 使用 data-index 属性而不是内联 onclick，避免模板字符串嵌套和引号冲突
-            const courseItems = whitelist.map((course, index) => `
-                            <div class="course-item" 
+            var courseItems = whitelist.map(function(course, index) {
+                return `<div class="course-item" 
                                  data-index="${index}"
                                  data-bv="${course.bv.replace(/"/g, '&quot;')}"
                                  data-name="${course.name.replace(/"/g, '&quot;')}"
@@ -7958,8 +7950,8 @@ const InterventionController = (function() {
                                         cursor: pointer; transition: all 0.2s;">
                                 <div style="font-weight: bold;">${course.name}</div>
                                 <div style="font-size: 12px; color: ${ciText};">${course.bv}</div>
-                            </div>
-            `).join('');
+                            </div>`;
+            }).join('');
             courseOptions = `
                 <div style="margin: 15px 0; padding: 10px; background: ${ctBg}; border-radius: 6px;">
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: ${ctLabel};">选择要返回的课程：</p>
@@ -7969,10 +7961,7 @@ const InterventionController = (function() {
                 </div>`;
         }
 
-        const modal = document.createElement('div');
-        modal.className = 'bilibili-study-modal-overlay';
-        modal.id = 'bilibili-study-confirm-modal';
-        modal.innerHTML = `
+        return `
             <div class="bilibili-study-modal" style="max-width: ${hasWhitelist ? '500px' : '400px'};">
                 <div class="bilibili-study-modal-header">
                     <h2>⚠️ 学习提醒</h2>
@@ -7993,8 +7982,32 @@ const InterventionController = (function() {
                         </button>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
+    }
+
+    function showConfirmModal() {
+        if (modalState !== MODAL_STATES.NONE) {
+            console.log('[B站学习助手] showConfirmModal: 跳过，当前弹窗状态=', modalState);
+            return;
+        }
+        console.log('[B站学习助手] showConfirmModal: 显示确认弹窗');
+        modalState = MODAL_STATES.CONFIRM;
+
+        // 获取白名单课程
+        const whitelist = ConfigManager.getWhitelistArray();
+        const hasWhitelist = whitelist && whitelist.length > 0;
+        const isDark = DetailPanel.getCurrentTheme() === 'dark';
+        const ciBg = isDark ? 'rgba(40,45,55,0.8)' : 'white';
+        const ciBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e0e0e0';
+
+        const modal = document.createElement('div');
+        modal.className = 'bilibili-study-modal-overlay';
+        modal.id = 'bilibili-study-confirm-modal';
+        modal.innerHTML = renderConfirmModalHTML({
+            whitelist: whitelist,
+            hasWhitelist: hasWhitelist,
+            isDark: isDark
+        });
 
         getModalContainer().appendChild(modal);
         applyCurrentThemeToModal(modal);
