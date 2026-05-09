@@ -14,16 +14,18 @@
 ## 项目结构
 ```
 f:\all_proj\study_help_web_app\
-├── bilibili-study-focus-assistant.user.js    # 主脚本（~8100行 IIFE 模块化）
+├── bilibili-study-focus-assistant.user.js    # 主脚本（~8936行 IIFE 模块化）
 ├── bilibili-study-focus-assistant.test.js    # 属性测试
 ├── AGENTS.md                                 # ← 本文件：Agent 简报
 ├── CHANGELOG.md                              # 完整版本历史
 ├── SCRIPT_LOGIC.md                           # 脚本运行逻辑详解
-├── docs/                                     # 设计文档目录
+├── docs/                                     # 设计文档 + 维护报告目录
 │   ├── design-spec-v1.3.0.md                 # v1.3.0 设计规范
 │   ├── design-spec-v1.3.0-multiwindow.md     # 多窗口设计规范
 │   ├── bugs.md                               # Bug 记录
 │   ├── bug-analysis.md / bug_fix_plan.md 等  # 分析文档
+│   ├── CLEANUP_CANDIDATES.md                 # 候选删除文件报告（自动生成）
+│   └── MAINTENANCE_LOG.md                    # 维护日志
 ├── package.json                              # 测试依赖
 ├── harness/                                  # Agent 开发 Harness
 │   ├── scripts/                              # 构建/检查脚本
@@ -93,4 +95,5 @@ v1.4.1 — Telemetry Dashboard 浮动窗 + 11指标 + 用户操作追踪（见 C
 - ✅ v1.3.1：内联样式修复 + 暗色适配补全
 - ✅ v1.4.0：Telemetry Dashboard（Logs/Metrics/Traces）
 - ✅ v1.4.1：浮动窗重构 + 用户操作追踪
-- 🔲 下一轮：Eval自动化 + 集成验证 + Harness升级
+- ✅ 下一轮：Eval自动化 + 集成验证 + Harness升级（2026-05-08 完成）
+- 🔲 待定：后续功能/修复

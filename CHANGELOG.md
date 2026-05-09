@@ -465,6 +465,102 @@
 
 ---
 
+## [1.4.1] - 2026-05-08
+
+### 功能改进 ✨
+
+#### Telemetry Dashboard 浮动窗重构 + 用户操作追踪
+- 将 Telemetry Dashboard 重写为可拖拽浮动窗口
+- 指标扩展至 11 项：状态、PV、BV、心跳、版本、Master、TabID、白名单、健康检查等
+- 新增用户操作追踪能力
+- 完善 Telemetry CSS 样式
+
+#### Harness 升级
+- 新增 `lint-modules.sh` 模块规范检查 + `check.sh` 升级
+- 新增 `eval-check.sh`（自动化 12 个评估案例）
+- 新增 `integration-check.sh` 集成验证
+- 共享接口文件 + 检错机制
+- 修复 5 个架构违规（InterventionController 通过 GlobalStateManager）
+- 修复 CSS class 名不匹配 + 补齐 Traces CSS + 删除死代码
+- 新增健康报告脚本 `health-report.sh`
+- Telemetry Metrics 新增 Harness 健康区段
+
+#### 文档
+- 设计文档迁移至 `docs/` 目录
+- AGENTS.md 行号修正
+
+---
+
+## [1.4.0] - 2026-05-07
+
+### 功能改进 ✨
+
+#### Telemetry Dashboard 调试面板
+- 新增 Telemetry Dashboard 面板（Logs/Metrics/Traces）
+- 可观测性系统增强
+- 修复 `autoNavigate is not defined` bug
+- 版本号 1.3.1 → 1.4.0
+
+---
+
+## [1.3.1] - 2026-05-07
+
+### Bug修复 🐛
+
+#### 内联样式修复 + 暗色适配补全
+- 修复内联样式问题
+- 补全暗色模式适配
+
+---
+
+## [1.3.0] - 2026-05-07
+
+### 功能改进 ✨
+
+#### P0 自动导航倒计时跳转
+- 自动导航功能实现：分心时倒计时跳转回学习视频
+- 含确认弹窗和取消机制
+
+#### P2 三级阻拦整合
+- 三级干预流水线：从温和提醒到强阻止的全链路整合
+- 各阶段差异化行为控制
+
+#### Stage 动态化配置
+- `getInterventionProfile` 动态配置体系（gentle/standard/strict）
+- 移除 `USER_CONFIG.interventionStages` 硬编码配置
+
+### 代码重构 🔄
+- 清理 duplicate autoNavigate save 逻辑
+- 技术债扫描 v1.3.0
+
+### 文档
+- 同步文档至 v1.3.0
+- 更新 AGENTS.md / SCRIPT_LOGIC.md / CHANGELOG.md
+
+---
+
+## [1.2.7] - 2026-05-06
+
+### 功能改进 ✨
+
+#### BroadcastChannel 多窗口同步
+- 基于 BroadcastChannel 的多窗口状态同步机制
+- BV 号记忆增强：多窗口间共享已访问视频记录
+- Toast 通知修复
+
+---
+
+## [1.2.6.2] - 2026-05-06
+
+### 功能改进 ✨
+
+#### DebugTelemetry 可观测性系统
+- 新增 DebugTelemetry 系统，提供结构化调试日志
+- 多窗口瞬态 Bug 修复
+- 项目文档同步
+
+---
+
 ## [1.0.5] - 2026-04-13
 
 ### 功能改进 ✨
@@ -704,4 +800,4 @@ MIT License
 
 ---
 
-最后更新：2026-04-16
+最后更新：2026-05-09
