@@ -44,36 +44,130 @@ if [ -z "$STYLES_END" ]; then
   STYLES_END=$(grep -n "^${BTICK}$" "$MAIN_JS" | head -1 | cut -d: -f1)
 fi
 
-# 提取 CSS 中定义的 class（只从 STYLES 常量区域）
+# ---- 提取 CSS 中定义的 class 和 keyframes（从 STYLES 常量区域） ----
 if [ -n "$STYLES_START" ] && [ -n "$STYLES_END" ]; then
-    awk -v start="$STYLES_START" -v end="$STYLES_END" 'NR>start && NR<end' "$MAIN_JS" \
-        | grep -oP '\.bilibili-study-\w+(?:-\w+)*' \
-        | sed 's/^\.//' | sort -u > "$TMPDIR/css_classes.txt" || true
+    awk -v start="$STYLES_START" -v end="$STYLES_END" 'NR>start && NR<end' "$MAIN_JS" > "$TMPDIR/css_area.txt"
 
-    # 提取 JS 引用的 class（只从非 STYLES 区域）
-    awk -v start="$STYLES_START" -v end="$STYLES_END" 'NR<start || NR>end' "$MAIN_JS" \
-        | grep -oP 'bilibili-study-\w+(?:-\w+)*' \
-        | sort -u > "$TMPDIR/js_refs_only.txt" || true
+    # 提取 .bilibili-study-xxx 常规 class 定义
+    grep -oP '\.bilibili-study-\w+(?:-\w+)*' "$TMPDIR/css_area.txt" \
+        | sed 's/^\.//' > "$TMPDIR/_css_regular.txt" || true
+
+    # 提取 @keyframes bilibili-study-xxx 动画名（有效 CSS 定义）
+    grep -oP '(?<=@keyframes\s)bilibili-study-\w+(?:-\w+)*' "$TMPDIR/css_area.txt" \
+        > "$TMPDIR/_css_keyframes.txt" 2>/dev/null || true
+
+    # 提取 class="bilibili-study-xxx" 内联定义（CSS 区域中可能的 HTML 模板）
+    grep -oP '(?<=class=")bilibili-study-\w+(?:-\w+)*(?=")' "$TMPDIR/css_area.txt" \
+        > "$TMPDIR/_css_inline.txt" 2>/dev/null || true
+
+    # 合并所有 CSS 定义
+    cat "$TMPDIR/_css_regular.txt" "$TMPDIR/_css_keyframes.txt" "$TMPDIR/_css_inline.txt" \
+        | sort -u > "$TMPDIR/css_classes.txt"
+
+    # ---- 提取 JS 中的 class 引用，并识别上下文（排除 ID / 动画名 / 动态模板） ----
+    awk -v start="$STYLES_START" -v end="$STYLES_END" '
+    BEGIN { q = sprintf("%c", 39) }
+    NR < start || NR > end {
+        rest = $0
+        while (match(rest, /bilibili-study-[a-zA-Z0-9-]+/)) {
+            name = substr(rest, RSTART, RLENGTH)
+            before = substr(rest, 1, RSTART - 1)
+            after = substr(rest, RSTART + RLENGTH)
+
+            ctx = "CLASS"
+            # getElementById(\x27xxx\x27) → DOM ID，不是 CSS class
+            if (before ~ ("getElementById\\(" q "$")) ctx = "ID"
+            # @keyframes xxx → 动画名，不是 CSS class
+            if (before ~ /@keyframes[[:space:]]+$/) ctx = "KEYFRAME"
+            # xxx${...} → 动态构建的 class 前缀
+            if (after ~ /\$\{/) ctx = "TEMPLATE_PREFIX"
+
+            print name "|" ctx
+            rest = substr(rest, RSTART + RLENGTH)
+        }
+    }' "$MAIN_JS" > "$TMPDIR/_js_classified.txt" || true
+
+    # 按类型分离
+    grep '\|CLASS$' "$TMPDIR/_js_classified.txt" | cut -d'|' -f1 | sort -u > "$TMPDIR/_js_class_refs.txt" || true
+    grep '\|ID$' "$TMPDIR/_js_classified.txt" | cut -d'|' -f1 | sort -u > "$TMPDIR/_js_ids.txt" || true
+    grep '\|KEYFRAME$' "$TMPDIR/_js_classified.txt" | cut -d'|' -f1 | sort -u > "$TMPDIR/_js_keyframes.txt" || true
+    grep '\|TEMPLATE_PREFIX$' "$TMPDIR/_js_classified.txt" | cut -d'|' -f1 | sort -u > "$TMPDIR/_js_templates_all.txt" || true
+
+    # 如果一个名字同时出现为 CLASS 和 TEMPLATE_PREFIX，那么它是真正的 class 引用
+    comm -23 "$TMPDIR/_js_ids.txt" "$TMPDIR/_js_class_refs.txt" 2>/dev/null > "$TMPDIR/_js_ids_only.txt" || true
+    comm -23 "$TMPDIR/_js_keyframes.txt" "$TMPDIR/_js_class_refs.txt" 2>/dev/null > "$TMPDIR/_js_keyframes_only.txt" || true
+    comm -23 "$TMPDIR/_js_templates_all.txt" "$TMPDIR/_js_class_refs.txt" 2>/dev/null > "$TMPDIR/_js_template_prefixes.txt" || true
+
+    # 真正的 class 引用（排除纯 ID / 纯 keyframe 后）
+    cp "$TMPDIR/_js_class_refs.txt" "$TMPDIR/js_refs_only.txt"
+
+    # ====== 交叉检查：JS 引用 vs CSS 定义 ======
+
+    # 真正缺失的 class：CLASS 类型且不在 CSS 中
+    if [ -s "$TMPDIR/js_refs_only.txt" ] && [ -s "$TMPDIR/css_classes.txt" ]; then
+        grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/js_refs_only.txt" 2>/dev/null \
+            | grep -v '^bilibili-study-dark-mode$' > "$TMPDIR/_truly_missing.txt" || true
+    fi
+
+    # 可能是假阳性的：ID/KEYFRAME/TEMPLATE_PREFIX 类型且不在 CSS 中
+    : > "$TMPDIR/_fp_report.txt"
+    if [ -s "$TMPDIR/_js_ids_only.txt" ]; then
+        grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/_js_ids_only.txt" 2>/dev/null \
+            | sed 's/^/   - [DOM ID] /' > "$TMPDIR/_fp_ids.txt" || true
+        [ -s "$TMPDIR/_fp_ids.txt" ] && cat "$TMPDIR/_fp_ids.txt" >> "$TMPDIR/_fp_report.txt"
+    fi
+    if [ -s "$TMPDIR/_js_keyframes_only.txt" ]; then
+        grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/_js_keyframes_only.txt" 2>/dev/null \
+            | sed 's/^/   - [动画名] /' > "$TMPDIR/_fp_keyframes.txt" || true
+        [ -s "$TMPDIR/_fp_keyframes.txt" ] && cat "$TMPDIR/_fp_keyframes.txt" >> "$TMPDIR/_fp_report.txt"
+    fi
+    if [ -s "$TMPDIR/_js_template_prefixes.txt" ]; then
+        grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/_js_template_prefixes.txt" 2>/dev/null \
+            | sed 's/^/   - [动态前缀] /' > "$TMPDIR/_fp_template.txt" || true
+        [ -s "$TMPDIR/_fp_template.txt" ] && cat "$TMPDIR/_fp_template.txt" >> "$TMPDIR/_fp_report.txt"
+    fi
+
+    # 输出真正缺失
+    TRULY_MISSING_COUNT=0
+    if [ -s "$TMPDIR/_truly_missing.txt" ]; then
+        TRULY_MISSING_COUNT=$(wc -l < "$TMPDIR/_truly_missing.txt")
+        printf "\n真正缺失的 class (%d 个):\n" "$TRULY_MISSING_COUNT"
+        cat "$TMPDIR/_truly_missing.txt" | sed 's/^/   - /'
+        ERRORS=$((ERRORS + TRULY_MISSING_COUNT))
+    fi
+
+    # 输出可能是假阳性的
+    FP_COUNT=0
+    if [ -s "$TMPDIR/_fp_report.txt" ]; then
+        FP_COUNT=$(wc -l < "$TMPDIR/_fp_report.txt")
+        printf "\n可能是假阳性 (%d 个):\n" "$FP_COUNT"
+        cat "$TMPDIR/_fp_report.txt"
+        WARNINGS=$((WARNINGS + FP_COUNT))
+    fi
+
+    if [ "$TRULY_MISSING_COUNT" -eq 0 ] && [ "$FP_COUNT" -eq 0 ]; then
+        echo "所有 JS 引用的 class 在 CSS 中都有定义"
+    fi
+
 else
     echo "警告: 无法确定 STYLES 常量边界，回退到全文件搜索"
     grep -oP '\.bilibili-study-\w+(?:-\w+)*' "$MAIN_JS" | sed 's/^\.//' | sort -u > "$TMPDIR/css_classes.txt"
     grep -oP 'bilibili-study-\w+(?:-\w+)*' "$MAIN_JS" | sort -u > "$TMPDIR/js_refs_only.txt"
-fi
 
-# 检查 JS 引用但 CSS 没定义的缺失类
-MISSING_COUNT=0
-if [ -s "$TMPDIR/js_refs_only.txt" ] && [ -s "$TMPDIR/css_classes.txt" ]; then
-    grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/js_refs_only.txt" 2>/dev/null \
-        | grep -v '^bilibili-study-dark-mode$' > "$TMPDIR/js_unmatched.txt" || true
-fi
-
-if [ -s "$TMPDIR/js_unmatched.txt" ]; then
-    MISSING_COUNT=$(wc -l < "$TMPDIR/js_unmatched.txt")
-    printf "\n缺失 CSS 定义 (%d 个 class):\n" "$MISSING_COUNT"
-    cat "$TMPDIR/js_unmatched.txt" | sed 's/^/   - /'
-    ERRORS=$((ERRORS + MISSING_COUNT))
-else
-    echo "所有 JS 引用的 class 在 CSS 中都有定义"
+    # 回退模式的简单检查
+    MISSING_COUNT=0
+    if [ -s "$TMPDIR/js_refs_only.txt" ] && [ -s "$TMPDIR/css_classes.txt" ]; then
+        grep -F -x -v -f "$TMPDIR/css_classes.txt" "$TMPDIR/js_refs_only.txt" 2>/dev/null \
+            | grep -v '^bilibili-study-dark-mode$' > "$TMPDIR/js_unmatched.txt" || true
+    fi
+    if [ -s "$TMPDIR/js_unmatched.txt" ]; then
+        MISSING_COUNT=$(wc -l < "$TMPDIR/js_unmatched.txt")
+        printf "\n缺失 CSS 定义 (%d 个 class):\n" "$MISSING_COUNT"
+        cat "$TMPDIR/js_unmatched.txt" | sed 's/^/   - /'
+        ERRORS=$((ERRORS + MISSING_COUNT))
+    else
+        echo "所有 JS 引用的 class 在 CSS 中都有定义"
+    fi
 fi
 
 # 检查 CSS 定义了但 JS 未引用的死代码
