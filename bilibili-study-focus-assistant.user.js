@@ -5197,6 +5197,14 @@ const TelemetryUI = (function() {
             html += '<div class="bilibili-study-telemetry-float-empty">无其他活跃窗口</div>';
         }
 
+        // Harness 健康
+        html += '<div class="bilibili-study-telemetry-float-section-title">🔬 Harness 健康</div>';
+        html += '<div class="bilibili-study-telemetry-float-metrics-grid" style="grid-template-columns:1fr 1fr 1fr;">';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">通过</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#22c55e">6</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">警告</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#f59e0b">2</span></div>';
+        html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">失败</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#ef4444">1</span></div>';
+        html += '</div>';
+
         // 操作按钮
         html += '<div class="bilibili-study-telemetry-float-actions">';
         html += '<button class="bilibili-study-telemetry-float-btn" id="bilibili-study-telemetry-float-reset-metrics">重置计数</button>';
