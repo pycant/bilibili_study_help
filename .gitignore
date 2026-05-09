@@ -34,3 +34,12 @@ Desktop.ini
 .env.*.local
 *.pem
 *.key
+
+# ---- 生成报告 / 临时输出 ----
+*.html
+*.svg
+out/
+dist/
+
+# ---- Harness 运行时产物（故障自动采集需创建时手动取消忽略） ----
+# harness/evals/failures/
