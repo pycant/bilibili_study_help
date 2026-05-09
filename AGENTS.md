@@ -19,10 +19,11 @@ f:\all_proj\study_help_web_app\
 ├── AGENTS.md                                 # ← 本文件：Agent 简报
 ├── CHANGELOG.md                              # 完整版本历史
 ├── SCRIPT_LOGIC.md                           # 脚本运行逻辑详解
-├── design-spec-v1.3.0.md                     # v1.3.0 设计规范
-├── design-spec-v1.3.0-multiwindow.md         # 多窗口设计规范
-├── bugs.md                                   # Bug 记录
-├── bug-analysis.md / bug_fix_plan.md 等      # 分析文档
+├── docs/                                     # 设计文档目录
+│   ├── design-spec-v1.3.0.md                 # v1.3.0 设计规范
+│   ├── design-spec-v1.3.0-multiwindow.md     # 多窗口设计规范
+│   ├── bugs.md                               # Bug 记录
+│   ├── bug-analysis.md / bug_fix_plan.md 等  # 分析文档
 ├── package.json                              # 测试依赖
 ├── harness/                                  # Agent 开发 Harness
 │   ├── scripts/                              # 构建/检查脚本
