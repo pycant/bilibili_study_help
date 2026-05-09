@@ -4,7 +4,7 @@
 
 ---
 
-## 一、当前 Harness 组件 (92% 完成)
+## 一、当前 Harness 组件 (95% 完成)
 
 | 组件 | 状态 | 说明 |
 |------|------|------|
@@ -15,9 +15,10 @@
 | `health-report.sh` | ✅ | JSON输出 + 同时保存到 `harness/health-status.json` |
 | `.harness-shared-interfaces.md` | ✅ | 多Agent共享接口定义 |
 | `docs/` | ✅ | 12个设计文档已移入 + README |
-| `log-failure.sh` | ✅ **新增** | Agent失败自动记录到 `harness/evals/failures/failures.jsonl` |
-| `analyze-failures.sh` | ✅ **新增** | 失败模式分析：按类型/Agent统计 |
-| `meta-update.sh` | ✅ **新增** | 失败模式→Skill更新建议 |
+| `log-failure.sh` | ✅ | Agent失败自动记录到 `harness/evals/failures/failures.jsonl` |
+| `analyze-failures.sh` | ✅ | 失败模式分析：按类型/Agent统计 |
+| `meta-update.sh` | ✅ | 失败模式→Skill更新建议 |
+| `meta-retro` | ✅ **新增** | 多Agent回顾讨论，三方反馈已蒸馏进 `harness-builder` Skill |
 | `Generator-Evaluator 分离` | ✅ **实验通过** | 第一轮验证成功 |
 
 ### 未完成
