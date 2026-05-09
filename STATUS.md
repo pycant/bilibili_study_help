@@ -17,14 +17,15 @@
 | `docs/` | ✅ | 12个设计文档已移入 + README |
 | `log-failure.sh` | ✅ **新增** | Agent失败自动记录到 `harness/evals/failures/failures.jsonl` |
 | `analyze-failures.sh` | ✅ **新增** | 失败模式分析：按类型/Agent统计 |
-| **Generator-Evaluator 分离** | ✅ **实验通过** | 第一轮验证成功 |
+| `meta-update.sh` | ✅ **新增** | 失败模式→Skill更新建议 |
+| `Generator-Evaluator 分离` | ✅ **实验通过** | 第一轮验证成功 |
 
 ### 未完成
 
 | 缺口 | 优先级 | 说明 |
 |------|--------|------|
-| 自动化 Skill 更新 | P2 | Meta Agent 读取失败模式 → 自动更新 SKILL.md (已有meta-update.sh分析脚本) |
-| npm test 回归 | P3 | ✅ 已回归 — 24/24 PASS，自包含测试框架 |
+| 自动化 Skill 更新 | P2 | 已有 `meta-update.sh` 分析建议，但自动写入 SKILL.md 还需连线 |
+| npm test | P3 | ✅ 已回归 — 24/24 PASS，`node bilibili-study-focus-assistant.test.js` |
 
 ---
 
