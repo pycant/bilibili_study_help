@@ -6751,6 +6751,7 @@ const PanelRenderer = (function() {
         renderModule5: renderModule5,
         renderModule6: renderModule6,
         renderStatusSections: renderStatusSections,
+        getTodayStats: getTodayStats,
         _injectVocabCallbacks: _injectVocabCallbacks
     };
 })();
@@ -6948,7 +6949,7 @@ function getWordRecords() {
 
     // Render Module 4: Focus suggestions
     function renderModule4() {
-        const stats = getTodayStats();
+        const stats = PanelRenderer.getTodayStats();
         const wordData = getWordRecords();
         const words = wordData.words || {};
         const masteredCount = Object.values(words).filter(w => w.mastered).length;
@@ -7022,6 +7023,7 @@ function getWordRecords() {
         getCurrentTheme: PanelRenderer.getCurrentTheme,
         detectTheme: PanelRenderer.detectTheme,
         loadTheme: PanelRenderer.loadTheme,
+        getTodayStats: PanelRenderer.getTodayStats,
         openSettings: SettingsPanel.openSettings
     };
 
