@@ -2045,14 +2045,6 @@ const USER_CONFIG = {
         defaultBV: "BV1EpNjzgEcs"  // 点击立即返回时默认跳转的BV号
     },
 
-    // Intervention thresholds (seconds) and popup intervals (seconds)
-    interventionStages: [
-        { threshold: 0, interval: 0 },      // Stage 0: Confirm
-        { threshold: 60, interval: 0 },     // Stage 1: 1min, visual only
-        { threshold: 180, interval: 60 },  // Stage 2: 3min, popup 1min
-        { threshold: 600, interval: 30 },   // Stage 3: 10min, popup 30s
-        { threshold: 1200, interval: 15 }   // Stage 4: 20min, popup 15s
-    ],
 
     // Vocabulary: ["Chinese:English", ...]
     // 包含六级+考研英语一核心词汇（约220词）
@@ -4379,6 +4371,14 @@ const StorageManager = (function() {
     };
 })();
 
+// Shared utility: format seconds to MM:SS or HH:MM:SS
+function bilibiliStudyFormatTime(seconds) {
+    var s = Math.floor(seconds);
+    var m = Math.floor(s / 60);
+    var h = Math.floor(m / 60);
+    return h > 0 ? (h + ':' + String(m % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0')) : (m + ':' + String(s % 60).padStart(2, '0'));
+}
+
 // ==========================================
 // Data Structure Definitions
 // ==========================================
@@ -4392,7 +4392,7 @@ const DEFAULT_DATA_STRUCTURES = {
         whitelist: USER_CONFIG.whitelist,
         learningVideoPanel: USER_CONFIG.learningVideoPanel,
         interventionConfig: {
-            stages: USER_CONFIG.interventionStages
+            stages: ConfigManager.getEffectiveInterventionStages()
         },
         vocabulary: USER_CONFIG.vocabulary,
         masteryThreshold: USER_CONFIG.masteryThreshold,
@@ -4600,18 +4600,6 @@ const FloatingWindow = (function() {
     }
 
     // Format time as "XhXm" or "XmXs"
-    function formatTime(seconds) {
-        if (seconds >= 3600) {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return `${hours}h${mins}m`;
-        } else {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}m${secs}s`;
-        }
-    }
-
     // Create and append floating window element
     function create() {
         if (element) {
@@ -4789,7 +4777,7 @@ const FloatingWindow = (function() {
             element.style.backgroundColor = 'rgba(34, 139, 34, 0.7)';
             element.innerHTML = `
                 <span class="bilibili-study-status-text">学习中</span>
-                <span class="bilibili-study-time-display">今日学习：${formatTime(studyTime || 0)}</span>
+                <span class="bilibili-study-time-display">今日学习：${bilibiliStudyFormatTime(studyTime || 0)}</span>
             `;
         } else {
             // Red background with varying opacity based on stage
@@ -4804,7 +4792,7 @@ const FloatingWindow = (function() {
             element.style.backgroundColor = `rgba(220, 20, 60, ${opacity})`;
             element.innerHTML = `
                 <span class="bilibili-study-status-text">分心中</span>
-                <span class="bilibili-study-time-display">已停留：${formatTime(distractionTime || 0)}</span>
+                <span class="bilibili-study-time-display">已停留：${bilibiliStudyFormatTime(distractionTime || 0)}</span>
             `;
         }
     }
@@ -5456,19 +5444,6 @@ const DetailPanel = (function() {
     }
 
     // Format time as "Xh Xm" or "Xm Xs"
-    function formatTime(seconds) {
-        if (!seconds || seconds < 0) seconds = 0;
-        if (seconds >= 3600) {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            return `${hours}小时${mins}分钟`;
-        } else {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}分${secs}秒`;
-        }
-    }
-
     // Get today's statistics
     function getTodayStats() {
         const stats = getOrInitModule('timeStats');
@@ -5605,11 +5580,11 @@ const DetailPanel = (function() {
                 <div class="bilibili-study-module-content">
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">有效学习时间：</span>
-                        <span class="bilibili-study-stat-value">${formatTime(stats.studyTime)}</span>
+                        <span class="bilibili-study-stat-value">${bilibiliStudyFormatTime(stats.studyTime)}</span>
                     </div>
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">分心时间：</span>
-                        <span class="bilibili-study-stat-value">${formatTime(stats.distractionTime)}</span>
+                        <span class="bilibili-study-stat-value">${bilibiliStudyFormatTime(stats.distractionTime)}</span>
                     </div>
                     <div class="bilibili-study-stat-row">
                         <span class="bilibili-study-stat-label">分心次数：</span>
