@@ -2236,7 +2236,7 @@ const ConfigManager = (function() {
                 currentConfig = { ...USER_CONFIG };
             }
         } catch (e) {
-            console.warn("Failed to load config from localStorage, using defaults:", e);
+            reportError(e, { module: 'ConfigManager', operation: 'load' });
             currentConfig = { ...USER_CONFIG };
         }
         return currentConfig;
@@ -2248,7 +2248,7 @@ const ConfigManager = (function() {
             currentConfig = { ...currentConfig, ...config };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(currentConfig));
         } catch (e) {
-            console.error("Failed to save config to localStorage:", e);
+            reportError(e, { module: 'ConfigManager', operation: 'save' });
         }
     }
 
@@ -2634,7 +2634,7 @@ const GlobalStateManager = (function() {
                 return { ...DEFAULT_STATE, ...parsed };
             }
         } catch (e) {
-            console.warn('[B站学习助手] GlobalStateManager.load: 读取失败，使用默认值', e);
+            reportError(e, { module: 'GlobalStateManager', operation: 'load' });
         }
         return { ...DEFAULT_STATE };
     }
@@ -2644,7 +2644,7 @@ const GlobalStateManager = (function() {
         try {
             localStorage.setItem(STATE_KEY, JSON.stringify(state));
         } catch (e) {
-            console.warn('[B站学习助手] GlobalStateManager.save: 写入失败', e);
+            reportError(e, { module: 'GlobalStateManager', operation: 'save' });
         }
     }
 
@@ -2856,7 +2856,7 @@ const TabManager = (function() {
                 return parsed.tabs || {};
             }
         } catch (e) {
-            console.warn('[B站学习助手] TabManager.getRegistry: 读取失败', e);
+            reportError(e, { module: 'TabManager', operation: 'getRegistry' });
         }
         return {};
     }
@@ -2866,7 +2866,7 @@ const TabManager = (function() {
         try {
             localStorage.setItem(REGISTRY_KEY, JSON.stringify({ tabs }));
         } catch (e) {
-            console.warn('[B站学习助手] TabManager.saveRegistry: 写入失败', e);
+            reportError(e, { module: 'TabManager', operation: 'saveRegistry' });
         }
     }
 
@@ -2955,7 +2955,9 @@ const TabManager = (function() {
                 heartbeat: now,
                 claimedAt: now
             }));
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'TabManager', operation: 'claimMaster' });
+        }
         isMaster = true;
         masterClaimTime = now;
         DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'claimMaster', {
@@ -2978,7 +2980,9 @@ const TabManager = (function() {
                 DebugTelemetry.logMultiTab('broadcast_master_claimed', {
                     tabId: TAB_ID.substring(0, 12) + '...'
                 });
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                reportError(e, { module: 'TabManager', operation: 'claimMasterBroadcast' });
+            }
         }
     }
 
@@ -2994,7 +2998,9 @@ const TabManager = (function() {
                         localStorage.removeItem(MASTER_KEY);
                     }
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                reportError(e, { module: 'TabManager', operation: 'releaseMaster' });
+            }
             isMaster = false;
             masterClaimTime = 0;
             DebugTelemetry.log(DebugTelemetry.CATEGORY.STATE, 'releaseMaster', {
@@ -3013,7 +3019,9 @@ const TabManager = (function() {
                     DebugTelemetry.logMultiTab('broadcast_master_released', {
                         tabId: TAB_ID.substring(0, 12) + '...'
                     });
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    reportError(e, { module: 'TabManager', operation: 'releaseMasterBroadcast' });
+                }
             }
         }
     }
@@ -3045,7 +3053,7 @@ const TabManager = (function() {
             // 无 Master 或 Master 超时 → 成为 Master
             claimMaster();
         } catch (e) {
-            console.warn('[B站学习助手] TabManager.elect: 选举失败，默认成为主窗口', e);
+            reportError(e, { module: 'TabManager', operation: 'elect' });
             isMaster = true;
             masterClaimTime = now;
         }
@@ -3074,7 +3082,9 @@ const TabManager = (function() {
                         // Master 标记丢失，重新声明
                         claimMaster();
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    reportError(e, { module: 'TabManager', operation: 'heartbeat' });
+                }
             } else {
                 // 非 Master 检查 Master 心跳
                 elect();
@@ -3142,6 +3152,7 @@ const TabManager = (function() {
                             claimMaster();
                         }
                     } catch (e) {
+                        reportError(e, { module: 'TabManager', operation: 'focusStealClaim' });
                         claimMaster();
                     }
                 }
@@ -3642,7 +3653,9 @@ const TabManager = (function() {
                             timestamp: Date.now()
                         });
                         DebugTelemetry.logMultiTab('broadcast_window_resolved', { bv: bv.substring(0, 12), title: title });
-                    } catch (e) { /* ignore */ }
+                    } catch (e) {
+                        reportError(e, { module: 'TabManager', operation: 'broadcastWindowResolved' });
+                    }
                 }
             }
         }
@@ -3836,6 +3849,7 @@ const TabManager = (function() {
                 tabId: TAB_ID.substring(0, 12) + '...'
             });
         } catch (e) {
+            reportError(e, { module: 'TabManager', operation: 'setupBroadcastChannel' });
             DebugTelemetry.logMultiTab('broadcast_channel_error', {
                 error: e.message
             });
@@ -4043,7 +4057,9 @@ const DebugTelemetry = (function() {
                 }
                 return summary;
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'DebugTelemetry', operation: 'getRegistrySnapshot' });
+        }
         return {};
     }
 
@@ -4059,7 +4075,9 @@ const DebugTelemetry = (function() {
                     interventionLevel: config.interventionLevel || 'standard'
                 };
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'DebugTelemetry', operation: 'getConfigSnapshot' });
+        }
         return {};
     }
 
@@ -4069,14 +4087,17 @@ const DebugTelemetry = (function() {
             let snapshots = [];
             const stored = localStorage.getItem(TELEMETRY_KEY);
             if (stored) {
-                try { snapshots = JSON.parse(stored); } catch(e) { snapshots = []; }
+                try { snapshots = JSON.parse(stored); } catch(e) {
+                    reportError(e, { module: 'DebugTelemetry', operation: 'parseSnapshots' });
+                    snapshots = [];
+                }
             }
             snapshots.push(snapshot);
             // FIFO：只保留最新的 MAX_SNAPSHOTS 条
             while (snapshots.length > MAX_SNAPSHOTS) snapshots.shift();
             localStorage.setItem(TELEMETRY_KEY, JSON.stringify(snapshots));
         } catch (e) {
-            console.warn('[B站学习助手] DebugTelemetry: 保存快照失败', e);
+            reportError(e, { module: 'DebugTelemetry', operation: 'saveSnapshot' });
         }
     }
 
@@ -4138,7 +4159,9 @@ const DebugTelemetry = (function() {
         try {
             var stored = localStorage.getItem(TELEMETRY_KEY);
             if (stored) return JSON.parse(stored).length;
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'DebugTelemetry', operation: 'getSnapshotCount' });
+        }
         return 0;
     }
 
@@ -4147,7 +4170,9 @@ const DebugTelemetry = (function() {
         try {
             const stored = localStorage.getItem(TELEMETRY_KEY);
             if (stored) return JSON.parse(stored);
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'DebugTelemetry', operation: 'getSavedSnapshots' });
+        }
         return [];
     }
 
@@ -4155,12 +4180,12 @@ const DebugTelemetry = (function() {
     function clearSnapshots() {
         try {
             localStorage.removeItem(TELEMETRY_KEY);
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            reportError(e, { module: 'DebugTelemetry', operation: 'clearSnapshots' });
+        }
     }
 
     // ── 便利封装 ──
-
-    // 创建拦截器：替换 console.log 使其同时写入 telemetry
     // 注意：这里不替换原始 console，而是提供辅助函数
     function logState(event, data) { return log(CATEGORY.STATE, event, data); }
     function logMultiTab(event, data) { return log(CATEGORY.MULTI_TAB, event, data); }
@@ -4249,7 +4274,7 @@ const HistoryVideoTracker = (function() {
                 return JSON.parse(stored);
             }
         } catch (e) {
-            console.warn('[B站学习助手] HistoryVideoTracker.getAll: 读取失败', e);
+            reportError(e, { module: 'HistoryVideoTracker', operation: 'getAll' });
         }
         return [];
     }
@@ -4272,7 +4297,7 @@ const HistoryVideoTracker = (function() {
             }
             localStorage.setItem(HISTORY_KEY, JSON.stringify(deduped));
         } catch (e) {
-            console.warn('[B站学习助手] HistoryVideoTracker.saveAll: 写入失败', e);
+            reportError(e, { module: 'HistoryVideoTracker', operation: 'saveAll' });
         }
     }
 
@@ -4303,7 +4328,7 @@ const HistoryVideoTracker = (function() {
         try {
             localStorage.removeItem(HISTORY_KEY);
         } catch (e) {
-            console.warn('[B站学习助手] HistoryVideoTracker.clear: 清除失败', e);
+            reportError(e, { module: 'HistoryVideoTracker', operation: 'clear' });
         }
     }
 
@@ -4340,6 +4365,7 @@ const StorageManager = (function() {
             localStorage.removeItem(testKey);
             return true;
         } catch (e) {
+            reportError(e, { module: 'StorageManager', operation: 'checkAvailability' });
             return false;
         }
     }
@@ -4362,7 +4388,7 @@ const StorageManager = (function() {
                 return memoryStorage[key] || null;
             }
         } catch (e) {
-            console.warn(`Failed to get module ${name} from storage:`, e);
+            reportError(e, { module: 'StorageManager', operation: 'getModule' });
             return memoryStorage[key] || null;
         }
     }
@@ -4377,7 +4403,7 @@ const StorageManager = (function() {
                 memoryStorage[key] = data;
             }
         } catch (e) {
-            console.error(`Failed to save module ${name} to storage:`, e);
+            reportError(e, { module: 'StorageManager', operation: 'setModule' });
             // Fallback to memory storage
             memoryStorage[key] = data;
         }
@@ -4604,7 +4630,7 @@ const FloatingWindow = (function() {
                 return JSON.parse(stored);
             }
         } catch (e) {
-            console.warn('Failed to get floating window position:', e);
+            reportError(e, { module: 'FloatingWindow', operation: 'getPosition' });
         }
         return null;
     }
@@ -4614,7 +4640,7 @@ const FloatingWindow = (function() {
         try {
             localStorage.setItem(POSITION_KEY, JSON.stringify({ x, y }));
         } catch (e) {
-            console.warn('Failed to save floating window position:', e);
+            reportError(e, { module: 'FloatingWindow', operation: 'setPosition' });
         }
     }
 
@@ -4918,7 +4944,7 @@ const TelemetryUI = (function() {
                 y: _floatWin.offsetTop
             }));
         } catch (e) {
-            console.warn('[B站学习助手] Failed to save telemetry window position:', e);
+            reportError(e, { module: 'TelemetryUI', operation: 'savePosition' });
         }
     }
 
@@ -4964,6 +4990,7 @@ const TelemetryUI = (function() {
                 _floatWin.style.top = '80px';
             }
         } catch (e) {
+            reportError(e, { module: 'TelemetryUI', operation: 'restorePosition' });
             _floatWin.style.left = '20px';
             _floatWin.style.top = '80px';
         }
@@ -5219,7 +5246,9 @@ const TelemetryUI = (function() {
                 hrWarn = hrSource.summary.warnings;
                 hrFail = hrSource.summary.failed;
             }
-        } catch (e) { /* 读取失败，用默认值 */ }
+        } catch (e) {
+            reportError(e, { module: 'TelemetryUI', operation: 'readHarnessHealth' });
+        }
         html += '<div class="bilibili-study-telemetry-float-section-title">🔬 Harness 健康</div>';
         html += '<div class="bilibili-study-telemetry-float-metrics-grid" style="grid-template-columns:1fr 1fr 1fr;">';
         html += '<div class="bilibili-study-telemetry-float-metric"><span class="bilibili-study-telemetry-float-metric-label">通过</span><span class="bilibili-study-telemetry-float-metric-val" style="color:#22c55e">' + hrPassed + '</span></div>';
@@ -5324,6 +5353,7 @@ const TelemetryUI = (function() {
             }
             return result;
         } catch (e) {
+            reportError(e, { module: 'TelemetryUI', operation: 'getRemoteWindowInfo' });
             return [];
         }
     }
@@ -5407,6 +5437,7 @@ const DetailPanel = (function() {
                 currentTheme = detectBilibiliTheme();
             }
         } catch (e) {
+            reportError(e, { module: 'DetailPanel', operation: 'loadTheme' });
             currentTheme = detectBilibiliTheme();
         }
         console.log('[B站学习助手] loadTheme: currentTheme=', currentTheme,
@@ -5433,7 +5464,7 @@ const DetailPanel = (function() {
             localStorage.setItem(THEME_KEY, theme);
             currentTheme = theme;
         } catch (e) {
-            console.warn('Failed to save theme preference:', e);
+            reportError(e, { module: 'DetailPanel', operation: 'saveTheme' });
         }
     }
 
@@ -8638,7 +8669,7 @@ const InterventionController = (function() {
         try {
             sessionStorage.setItem('bilibiliStudyAssistant_tabId', tabId);
         } catch (e) {
-            console.warn('Failed to save tab ID to sessionStorage:', e);
+            reportError(e, { module: 'Main', operation: 'generateTabId' });
         }
         return tabId;
     }
@@ -8651,7 +8682,7 @@ const InterventionController = (function() {
             }
             return tabId;
         } catch (e) {
-            console.warn('Failed to get tab ID from sessionStorage:', e);
+            reportError(e, { module: 'Main', operation: 'getTabId' });
             return 'tab_fallback_' + Math.random().toString(36).substr(2, 9);
         }
     }
@@ -8673,7 +8704,9 @@ const InterventionController = (function() {
         if (typeof unsafeWindow !== 'undefined') {
             unsafeWindow.__bilibiliStudyAppState = window.__bilibiliStudyAppState;
         }
-    } catch(e) { /* 沙箱限制，忽略 */ }
+    } catch(e) {
+        reportError(e, { module: 'Main', operation: 'exposeAppState' });
+    }
 
     // Initialize config
     ConfigManager.load();
@@ -8684,7 +8717,7 @@ const InterventionController = (function() {
         DetailPanel.loadTheme();
         console.log('[B站学习助手] init: loadTheme 完成');
     } catch(e) {
-        console.error('[B站学习助手] init: loadTheme 失败!', e);
+        reportError(e, { module: 'Main', operation: 'initLoadTheme' });
     }
 
     // Initialize data modules
@@ -8695,7 +8728,7 @@ const InterventionController = (function() {
         wordRecords = getOrInitModule('wordRecords');
         console.log('[B站学习助手] init: Storage modules 初始化完成');
     } catch(e) {
-        console.error('[B站学习助手] init: Storage modules 初始化失败!', e);
+        reportError(e, { module: 'Main', operation: 'initStorageModules' });
     }
 
     console.log('Storage modules initialized:', {
@@ -8710,7 +8743,7 @@ const InterventionController = (function() {
         PageMonitor.init();
         console.log('[B站学习助手] init: PageMonitor.init 完成');
     } catch(e) {
-        console.error('[B站学习助手] init: PageMonitor.init 失败!', e);
+        reportError(e, { module: 'Main', operation: 'initPageMonitor' });
     }
 
     // Initialize statistics tracker
@@ -8718,7 +8751,7 @@ const InterventionController = (function() {
         StatisticsTracker.init();
         console.log('[B站学习助手] init: StatisticsTracker.init 完成');
     } catch(e) {
-        console.error('[B站学习助手] init: StatisticsTracker.init 失败!', e);
+        reportError(e, { module: 'Main', operation: 'initStatisticsTracker' });
     }
 
     // Create floating window if on video page
@@ -8732,7 +8765,7 @@ const InterventionController = (function() {
             console.log('[B站学习助手] init: FloatingWindow 创建完成');
         }
     } catch(e) {
-        console.error('[B站学习助手] init: FloatingWindow 创建失败!', e);
+        reportError(e, { module: 'Main', operation: 'initFloatingWindow' });
     }
 
     // Main timer loop - runs every second
@@ -8928,7 +8961,7 @@ const InterventionController = (function() {
         TabManager.init();
         console.log('[B站学习助手] init: TabManager.init 完成');
     } catch(e) {
-        console.error('[B站学习助手] init: TabManager.init 失败!', e);
+        reportError(e, { module: 'Main', operation: 'initTabManager' });
     }
 
     // ── v1.2.4: 恢复视觉干预效果 ──
@@ -8941,7 +8974,7 @@ const InterventionController = (function() {
             InterventionController.applyVisualIntervention(restoredStage);
         }
     } catch(e) {
-        console.error('[B站学习助手] init: 恢复视觉干预效果失败', e);
+        reportError(e, { module: 'Main', operation: 'restoreVisualIntervention' });
     }
 
     // ── v1.2.3: beforeunload 钩子 ──
