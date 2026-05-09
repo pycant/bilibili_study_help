@@ -81,10 +81,10 @@ if [ -n "$STYLES_START" ] && [ -n "$STYLES_END" ]; then
             if (before ~ /@keyframes[[:space:]]+$/) ctx = "KEYFRAME"
             # xxx${...} → 动态构建的 class 前缀
             if (after ~ /\$\{/) ctx = "TEMPLATE_PREFIX"
-            # id="xxx" 或 id='xxx' → DOM HTML 属性 ID
-            if (before ~ /id="$/ || before ~ /id='"'"'$/) ctx = "ID"
-            # .id = 'xxx' 或 .id = "xxx" → DOM ID 赋值
-            if (before ~ /\.id[[:space:]]*=[[:space:]]*"$/ || before ~ /\.id[[:space:]]*=[[:space:]]*'"'"'$/) ctx = "ID"
+            # id="xxx" → DOM HTML 属性 ID
+            if (before ~ /id="$/ || before ~ ("id=" q "$")) ctx = "ID"
+            # .id = "xxx" → DOM ID 赋值
+            if (before ~ /\.id[[:space:]]*=[[:space:]]*"$/ || before ~ ("\\.id[[:space:]]*=[[:space:]]*" q "$")) ctx = "ID"
 
             print name "|" ctx
             rest = substr(rest, RSTART + RLENGTH)
